@@ -464,9 +464,13 @@ Both log-affine variants beat `cpp_specialized_gaussian` and `r_vectorized_faste
 
 ## Benchmarking Across N: Why
 
-- Not R vs. C++: it's acceptance rate. The Gaussian envelope accepts only $\approx$ 13% of proposals, needing $\approx$ 7--8$\times$ as many (expensive) evaluations of the 100-term log-likelihood sum per accepted sample
-- `log_affine_m5` (87.7% acceptance) and `log_affine_m20_best` (99.5%) are nearly identical here — the best $m$ buys a much tighter envelope almost for free
-- `cpp_specialized_gaussian` and `r_vectorized_faster_gaussian` stay close together — a tight C++ loop doesn't fix a low acceptance rate
+**Acceptance rate decides the speed — not the language.**
+
+| Method | Acceptance |
+|---|---|
+| Gaussian envelope (R or C++) | $\approx$ 13% |
+| Log-affine, $m=5$ | 87.7% |
+| Log-affine, best $m$ | 99.5% |
 
 ## Questions & Further Work
 

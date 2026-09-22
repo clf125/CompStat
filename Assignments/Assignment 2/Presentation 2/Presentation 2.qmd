@@ -23,10 +23,9 @@ $$
 f(y) \propto q(y) = \exp\left(\sum_{i=1}^{m} (y z_i x_i - e^{y x_i})\right) \mathbf{1}_{\{y \geq 0\}}, \quad m = 100
 $$
 
-- The posterior for a single coefficient in a Poisson regression model
 - Data: 100 observations $(z_i, x_i)$, with $x_i > 0$
 
-**Goal:** sample from $f$ via rejection sampling, using two different envelope constructions:
+**Goal:** sample from $f$ via rejection sampling, using two different envelope constructions
 
 - A Gaussian envelope
 - A piecewise log-affine envelope

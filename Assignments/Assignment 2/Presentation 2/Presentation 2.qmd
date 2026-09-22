@@ -101,8 +101,8 @@ log_rejection_sample_vec <- rng_vec(log_rejection_sample_random)
 #| fig-width: 6.5
 #| fig-height: 4
 #| fig-align: center
-setwd("C:/Users/carla/Documents/Computational Statistics")
-source("Assignment/Assignment 2/Target_setup.R")
+setwd(here::here())
+source("Assignments/Assignment 2/Target_setup.R")
 A <- sum(dat$x * (dat$z - 1)); B <- sum(dat$x^2)
 mu <- A / B; sigma <- sqrt(1 / B)
 log_alpha_prime <- 100 - A^2/(2*B) - log(sigma*sqrt(2*pi))
@@ -431,13 +431,13 @@ out <- find_best_m(c(2, 3, 5, 8, 12, 20, 30, 50, 60, 70), N = 1000, min_iteratio
 ```{r}
 #| echo: false
 #| include: false
-setwd("C:/Users/carla/Documents/Computational Statistics")
-source("Assignment/Assignment 2/Log-affine_envelope.R")
+setwd(here::here())
+source("Assignments/Assignment 2/Log-affine_envelope.R")
 # The m = 5..70 sweep is noisy (the timings are all close together), so
 # re-running it here would pick a different "best m" than the one marked on
 # sweep_plot.png. Use the cached result instead, so the slide text, the
 # static plot, and the correctness-check histogram all agree.
-out <- readRDS("Assignment/Assignment 2/Presentation 2/best_m.rds")
+out <- readRDS("Assignments/Assignment 2/Presentation 2/best_m.rds")
 ```
 
 ## How the Best m Was Chosen

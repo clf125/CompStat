@@ -1,6 +1,6 @@
-source("Assignment/Assignment 2/Gaussian_envelope.R")
-Rcpp::sourceCpp("Assignment/Assignment 2/CPP_Gaussian_rejection_general.cpp")
-Rcpp::sourceCpp("Assignment/Assignment 2/CPP_Gaussian_rejection_specialized.cpp")
+source("Assignments/Assignment 2/Gaussian_envelope.R")
+Rcpp::sourceCpp("Assignments/Assignment 2/CPP_Gaussian_rejection_general.cpp")
+Rcpp::sourceCpp("Assignments/Assignment 2/CPP_Gaussian_rejection_specialized.cpp")
 
 ## ---- Single benchmark, N = 1000 -------------------------------------------
 

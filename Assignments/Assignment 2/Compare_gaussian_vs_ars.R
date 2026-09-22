@@ -1,8 +1,8 @@
 # Compare the two required Option A methods: the Gaussian envelope
 # vs. the piecewise log-affine / adaptive rejection sampling envelope.
 
-source("Assignment/Assignment 2/Gaussian_envelope.R")
-source("Assignment/Assignment 2/Log-affine_envelope.R")
+source("Assignments/Assignment 2/Gaussian_envelope.R")
+source("Assignments/Assignment 2/Log-affine_envelope.R")
 
 ## ---- Build a good fixed log-affine envelope (m=30, near-optimal from the sweep) ----
 

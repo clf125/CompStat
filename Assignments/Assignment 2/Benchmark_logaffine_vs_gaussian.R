@@ -3,9 +3,9 @@
 # envelope implementations: the vectorized R sampler and the specialized C++
 # sampler.
 
-source("Assignment/Assignment 2/Log-affine_envelope.R")
-source("Assignment/Assignment 2/Gaussian_envelope.R")
-Rcpp::sourceCpp("Assignment/Assignment 2/CPP_Gaussian_rejection_specialized.cpp")
+source("Assignments/Assignment 2/Log-affine_envelope.R")
+source("Assignments/Assignment 2/Gaussian_envelope.R")
+Rcpp::sourceCpp("Assignments/Assignment 2/CPP_Gaussian_rejection_specialized.cpp")
 
 ## ---- Fixed log-affine envelopes: m = 5 and m = best (from the sweep) ------
 

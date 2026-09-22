@@ -1,5 +1,5 @@
 #Profiling the Gaussian sampler, before and after vectorizing log_f
-source("Assignment/Assignment 2/Gaussian_envelope.R", keep.source = TRUE)
+source("Assignments/Assignment 2/Gaussian_envelope.R", keep.source = TRUE)
 
 #Profile the original sampler: reveals the sapply bottleneck in log_f_vec (~98% of runtime)
 profvis::profvis({

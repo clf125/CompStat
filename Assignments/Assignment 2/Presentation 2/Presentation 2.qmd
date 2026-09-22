@@ -101,7 +101,7 @@ log_rejection_sample_vec <- rng_vec(log_rejection_sample_random)
 #| fig-width: 6.5
 #| fig-height: 4
 #| fig-align: center
-setwd(here::here())
+setwd(rprojroot::find_root(rprojroot::is_vcs_root))
 source("Assignments/Assignment 2/Target_setup.R")
 A <- sum(dat$x * (dat$z - 1)); B <- sum(dat$x^2)
 mu <- A / B; sigma <- sqrt(1 / B)
@@ -156,15 +156,9 @@ profvis::profvis({
 \normalsize
 ```
 
-| Function                           | \% of total time |
-|------------------------------------|------------------|
-| `FUN` (inner function of `sapply`) | 80.4%            |
-| `$` (data frame column access)     | 7.9%             |
-| `lapply`                           | 6.0%             |
-| `sum`                              | 3.6%             |
-| `dnorm`, `rnorm`, `runif`, other   | 1.7%             |
+![](profiling_before.png){width="90%"}
 
-**97.8% of runtime is inside `log_f_vec`** — not the math itself, but calling a fresh R function once per proposal via `sapply`.
+**98.5% of self time is on one line** — not the math itself, but calling a fresh R closure once per proposal via `sapply`.
 
 ## Vectorizing `log_f`
 
@@ -188,12 +182,7 @@ log_f_vec_faster <- function(y) {
 
 **Profiling `log_f_vec_faster`:** the `sapply` bottleneck is gone — runtime is now genuinely inside the vectorized math itself:
 
-| Function               | \% of total time |
-|------------------------|------------------|
-| `log_f_vec_faster`     | 97.8%            |
-| `colSums`              | 94.9%            |
-| `exp`                  | 15.2%            |
-| `outer` / `tcrossprod` | 2.9%             |
+![](profiling_after.png){width="90%"}
 
 ```{=latex}
 \normalsize
@@ -431,7 +420,7 @@ out <- find_best_m(c(2, 3, 5, 8, 12, 20, 30, 50, 60, 70), N = 1000, min_iteratio
 ```{r}
 #| echo: false
 #| include: false
-setwd(here::here())
+setwd(rprojroot::find_root(rprojroot::is_vcs_root))
 source("Assignments/Assignment 2/Log-affine_envelope.R")
 # The m = 5..70 sweep is noisy (the timings are all close together), so
 # re-running it here would pick a different "best m" than the one marked on

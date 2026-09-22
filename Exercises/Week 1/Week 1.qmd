@@ -1,0 +1,119 @@
+---
+title: "Week 1 - CompStat"
+author: "Valdemar Schaaf - CLF125"
+date: today
+format:
+  html:
+    toc: true
+execute:
+  echo: true
+---
+
+```{r}
+#| echo: true
+#| message: false
+#| warning: false
+#| results: hide
+
+library(tidyverse)
+```
+
+# Week 1
+
+## Exercise A.1
+
+Explain the result of evaluating the following R expression.
+
+```{r}
+(0.1 + 0.1 + 0.1) > 0.3
+```
+
+## Exercise A.2
+
+Write a function that takes a numeric vector x and a threshold value h as arguments and returns the vector of all values in x greater than h. Test the function on seq(0, 1, 0.1) with threshold 0.3. Have the example from Exercise A.1 in mind
+
+```{r}
+values_greater_than <- function(x, h, tolerance = sqrt(.Machine$double.eps)) {
+  valid_values <- !is.na(x) & !is.nan(x) & is.finite(x)
+  x[valid_values & x > h + tolerance]
+}
+
+values_greater_than(seq(0, 1, 0.1), 0.3)
+```
+
+## Exercise A.3 
+Investigate how your function from Exercise A.2 treats missing values (NA), infinite values (Inf and -Inf) and the special value “Not a Number” (NaN). Rewrite your function (if necessary) to exclude all or some of such values from x.
+
+```{r}
+# Test with missing values
+values_greater_than(c(0.1, 0.2, NA, 0.4), 0.25)
+
+# Test with infinite values
+values_greater_than(c(0.1, 0.2, Inf, -Inf), 0.25)
+
+# Test with NaN
+values_greater_than(c(0.1, 0.2, NaN, 0.4), 0.25)
+```
+
+## Data
+
+```{r}
+infrared <- read.table("Data/infrared.txt", header = TRUE)
+F12 <- infrared$F12
+head(F12)
+```
+
+## Exercise A.4 
+Plot a histogram of log(F12) using the default value of the argument breaks. Experiment with alternative values of breaks.
+
+```{r}
+hist(log(F12))
+hist(log(F12), breaks = 50)
+hist(log(F12), breaks = 100)
+```
+## Exercise A.5 
+Write your own function, called my_breaks, which takes two arguments, x (a vector) and h (a positive integer). Let h have default value 5. The function should first sort x into increasing order and then return the vector that: starts with the smallest entry in x; contains every h'th unique entry from the sorted x; ends with the largest entry in x.
+
+```{r}
+my_breaks <- function(x, h = 5) {
+  unique_x <- sort(unique(x))
+  breaks <- unique_x[seq(1, length(unique_x), by = h)]
+
+  sort(unique(c(
+    unique_x[1],
+    breaks,
+    unique_x[length(unique_x)]
+  )))
+}
+```
+
+```{r}
+x = c(1, 3, 2, 5, 10, 11, 1, 1, 3)
+my_breaks(x, h = 2)
+```
+
+ 
+Use your function to construct breakpoints for the histogram for different values of h, and compare with the histograms obtained in Exercise A.4.
+
+
+## Exercise 1: Create a simple s3 class
+Write a function make_point(x,y) that returns an object if class "point" with elements x and y.
+
+Write a print method print.point() that prints the point in the form (x,y).
+
+```{r}
+make_point <- function(x, y) {
+  structure(
+    list(x = x, y = y),
+    class = "point"
+  )
+}
+
+print.point <- function(point, ...) {
+  cat("(", point$x, ",", point$y, ")\n", sep = "")
+}
+
+p <- make_point(2, 3)
+p
+
+```

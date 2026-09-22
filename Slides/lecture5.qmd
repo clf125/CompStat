@@ -1,0 +1,2427 @@
+---
+title: "Transformation and Rejection Sampling"
+---
+
+{{< include _common.qmd >}}
+
+```{r}
+#| label: setup
+#| include: false
+
+library(profvis)
+
+knitr::read_chunk(here::here("R", "vMSim.R"))
+
+source(here::here("R", "vMSim.R"), keep.source = TRUE)
+```
+
+## Today
+
+### Transformation Methods
+
+Transform samples from a simpler distribution, including by inversion of the
+CDF.
+
+. . .
+
+### Rejection Sampling
+
+Sample using a density that may be known only up to normalization.
+
+## Why Do We Need a Sampler?
+
+Simulation lets us explore the consequences of a statistical model when analytic
+calculations are difficult.
+
+\medskip\pause
+
+How biased is an estimator in a small sample? Does a nominal 95% confidence
+interval actually achieve 95% coverage?
+
+\medskip\pause
+
+\begin{center}
+\begin{tikzpicture}[node distance=0.4cm, >=stealth, font=\small]
+  \node[draw, rounded corners, fill=blue!10] (data) {Simulate data};
+  \node[draw, rounded corners, fill=orange!10, right=of data] (fit) {Compute estimates};
+  \node[draw, rounded corners, fill=green!10, right=of fit] (repeat) {Assess bias, coverage, etc.};
+  \draw[->] (data) -- (fit);
+  \draw[->] (fit) -- (repeat);
+\end{tikzpicture}
+\end{center}
+
+\medskip\pause
+
+Draws also let us estimate probabilities and expectations, including tail
+probabilities and posterior summaries.
+
+\medskip\pause
+
+All of these applications need **reliable and efficient sampling from a
+specified distribution.**
+
+## Pseudo-Random Numbers
+
+The basis for all sampling methods is a source of random numbers and R uses
+deterministic algorithms to generate **pseudo-random** numbers.
+
+\medskip\pause
+
+The sequences are reproducible from a seed but designed to appear random.
+
+\medskip\pause
+
+A research field in itself. See `?RNG` in R for available algorithms.
+
+. . .
+
+### Mersenne Twister
+
+The default in R, which generates integers in the range
+$$
+  \{0, 1, \ldots, 2^{32} - 1\}.
+$$
+
+\medskip\pause
+
+Long period: $2^{19937} - 1$. Blocks of up to 623 consecutive integers occur
+nearly equally often over a full period.
+
+. . .
+
+### Uniform Random Variables in R
+
+`runif()` scales these pseudo-random integers to the unit interval, with
+adjustments to exclude 0 and 1.
+
+\pdfpcnote{
+  Random numbers are used in many applications.
+  Use \texttt{RNGkind()} to inspect the selected pseudo-random number generator,
+  normal sampler, and discrete sampling method used by \texttt{sample()}.
+}
+
+## From Uniform Random Numbers to Target Distributions
+
+\begin{figure}
+  \begin{tikzpicture}[node distance=1cm, auto, >=stealth, thick]
+    \node[draw, rectangle, rounded corners, fill=gray!20] (A) {Integers from Pseudo-RNG};
+    \node[draw, rectangle, rounded corners, below=of A, fill=green!10] (B) {$\mathcal{U}(0, 1)$};
+    \node[draw, rectangle, rounded corners, below right=of B, fill=orange!10] (D1) {Transformation methods};
+    \node[draw, rectangle, rounded corners, below left=of B, fill=red!10] (D2) {Rejection sampling};
+
+    \draw[->] (A) -- (B);
+    \draw[->] (B) -- (D1);
+    \draw[->] (B) -- (D2);
+  \end{tikzpicture}
+  \caption{Main categories of sampling methods (in this course).}
+\end{figure}
+
+## Transformation Methods
+
+To sample from a target distribution with CDF $F$, choose a random variable $Z$
+that we can simulate and a computable, measurable transformation $T$ such that
+$$
+  \Pr(T(Z) \le x) = F(x), \qquad x \in \mathbb{R}.
+$$
+
+\pause
+
+\begin{figure}
+\centering
+\begin{tikzpicture}[node distance=1cm, auto, >=stealth, thick]
+  \node[draw, rectangle, rounded corners, fill=blue!10] (A) {Sample $Z$};
+  \node[draw, rectangle, rounded corners, right = of A, fill=green!10] (B) {Apply $T$};
+  \node[draw, rectangle, rounded corners, right = of B, fill=orange!10] (C) {Get $X = T(Z)$};
+  \draw[->] (A) -- (B);
+  \draw[->] (B) -- (C);
+\end{tikzpicture}
+\end{figure}
+
+\pause
+
+### Example {.example}
+
+To sample $X \sim \mathrm{Exp}(\lambda)$ with rate $\lambda > 0$, use
+$X = -\log(U)/\lambda$ with $U \sim \mathcal{U}(0, 1)$.
+
+\medskip\pause
+
+For $x \ge 0$,
+$$
+  \Pr\!\left( -\frac{\log U}{\lambda} \le x \right) = \Pr(U \ge e^{-\lambda x})
+                                                    = 1 - e^{-\lambda x}.
+$$
+
+## Example: Sampling from a $t$-Distribution
+
+If we let
+$$
+  T(z,w) = \frac{z}{\sqrt{w/k}},
+$$
+and take independent $Z \sim \mathcal{N}(0,1)$ and $W \sim \chi^2_k$ with
+$k > 0$, then
+$$
+  X = T(Z, W) = \frac{Z}{\sqrt{W/k}} \sim t_k.
+$$
+
+. . .
+
+This transformation is used in R and other software to simulate $t$-distributed
+random variables.
+
+\medskip\pause
+
+\begin{algorithm}[H]
+  \caption{Transformation sampling for the $t$-distribution}
+  $z \gets $ sample from $\mathcal{N}(0, 1)$\;
+  $w \gets $ sample from $\chi^2_k$, independently of $z$\;
+  \KwRet{$z / \sqrt{w / k}$}\;
+\end{algorithm}
+
+## Inversion Sampling
+
+A type of **transformation** sampling.
+
+\medskip\pause
+
+If $F^{-1} : (0,1) \to \mathbb{R}$ is the generalized inverse of a distribution
+function $F$ and $U$ is uniformly distributed on $(0, 1)$, then
+$$
+  F^{-1}(U)
+$$
+has distribution function $F$.
+
+\medskip\pause
+
+Computing $F^{-1}$ can be simple (e.g., for the exponential distribution) or
+require a search or numerical approximation.
+
+## Following the Inverse CDF
+
+For $X \sim \mathrm{Exp}(1)$, $F(x) = 1 - e^{-x}$ for $x \geq 0$.
+
+```{r}
+#| label: inversion-cdf-arrows
+#| echo: false
+#| fig-show: animate
+#| fig-width: 5
+#| fig-height: 2.2
+
+inverse_example <- tibble(u = c(0.2, 0.6, 0.9)) |>
+  mutate(x = -log1p(-u))
+
+inverse_curve <- tibble(x = seq(0, 3, length.out = 300)) |>
+  mutate(cdf = pexp(x))
+
+for (stage in 1:3) {
+  p <- ggplot(inverse_curve, aes(x, cdf)) +
+    geom_line() +
+    geom_point(
+      data = inverse_example,
+      aes(x = 0, y = u),
+      color = "royalblue"
+    ) +
+    scale_y_continuous(breaks = c(0, 0.2, 0.6, 0.9, 1)) +
+    coord_cartesian(xlim = c(0, 3), ylim = c(0, 1)) +
+    labs(x = expression(x), y = expression(F(x)))
+  if (stage >= 2) {
+    p <- p +
+      geom_segment(
+        data = inverse_example,
+        aes(x = 0, xend = x, y = u, yend = u),
+        arrow = grid::arrow(length = grid::unit(0.07, "inches")),
+        color = "royalblue"
+      )
+  }
+  if (stage >= 3) {
+    p <- p +
+      geom_segment(
+        data = inverse_example,
+        aes(x = x, xend = x, y = u, yend = 0),
+        arrow = grid::arrow(length = grid::unit(0.07, "inches")),
+        color = "darkorange"
+      )
+  }
+  print(p)
+}
+```
+
+Move right from $U$ to the CDF, then down to $X = F^{-1}(U) = -\log(1 - U)$.
+
+## Inversion for a Discrete Distribution
+
+The **generalized inverse** is $F^{-1}(u) = \inf\{x : F(x) \geq u\}$.
+
+```{r}
+#| label: inversion-discrete-cdf
+#| echo: false
+#| fig-show: animate
+#| fig-width: 5
+#| fig-height: 2.2
+
+discrete_cdf <- tibble(
+  left = c(-0.4, 0, 1, 2),
+  right = c(0, 1, 2, 2.4),
+  cdf = c(0, 0.2, 0.7, 1)
+)
+
+for (stage in 1:2) {
+  p <- ggplot(discrete_cdf) +
+    geom_segment(aes(
+      x = left,
+      xend = right,
+      y = cdf,
+      yend = cdf
+    )) +
+    geom_point(
+      data = discrete_cdf[-1, ],
+      aes(x = left, y = cdf)
+    ) +
+    geom_point(
+      data = discrete_cdf[-4, ],
+      aes(x = right, y = cdf),
+      shape = 21,
+      fill = "white"
+    ) +
+    scale_x_continuous(breaks = 0:2) +
+    scale_y_continuous(breaks = c(0, 0.2, 0.7, 1)) +
+    coord_cartesian(ylim = c(0, 1)) +
+    labs(x = expression(x), y = expression(F(x)))
+  if (stage >= 2) {
+    p <- p +
+      annotate(
+        "segment",
+        x = -0.2,
+        xend = -0.2,
+        y = 0.2,
+        yend = 0.7,
+        color = "darkorange"
+      ) +
+      annotate(
+        "segment",
+        x = -0.2,
+        xend = 1,
+        y = 0.55,
+        yend = 0.55,
+        arrow = grid::arrow(length = grid::unit(0.07, "inches")),
+        color = "darkorange"
+      ) +
+      annotate(
+        "segment",
+        x = 1,
+        xend = 1,
+        y = 0.55,
+        yend = 0,
+        arrow = grid::arrow(length = grid::unit(0.07, "inches")),
+        color = "darkorange"
+      ) +
+      annotate("text", x = 0.4, y = 0.63, label = "u = 0.55")
+  }
+  print(p)
+}
+```
+
+Every $u \in (0.2, 0.7]$ maps to 1, so $\Pr(X = 1) = 0.7 - 0.2 = 0.5$.
+
+## Von Mises Distribution
+
+The density on $(-\pi, \pi]$ is
+$$
+  f(x) = \frac{1}{2 \pi I_0(\kappa)} \ e^{\kappa \cos(x-\mu)},
+$$
+where $\mu \in (-\pi, \pi]$ is the location, $\kappa \geq 0$ is the
+concentration, and $I_0$ is the modified Bessel function of the first kind of
+order 0.
+
+\medskip
+
+```{r}
+#| label: vMdensity
+#| fig-cap: The von Mises density for $\mu = 0$ and $\kappa = 5$.
+#| echo: false
+#| fig-width: 5
+#| fig-height: 2
+
+dvm <- function(x, k) exp(k * cos(x)) / (2 * pi * besselI(k, 0))
+
+xy <- tibble(x = seq(-pi, pi, length.out = 400), y = dvm(x, 5))
+
+p1 <- ggplot(xy, aes(x, y)) +
+  geom_line(color = "royalblue") +
+  scale_x_continuous(
+    breaks = c(-pi, 0, pi),
+    labels = expression(-pi, 0, pi)
+  ) +
+  labs(x = expression(x), y = "Density")
+
+p2 <- ggplot(xy, aes(x, y)) +
+  geom_line(color = "royalblue") +
+  scale_x_continuous(
+    limits = c(-pi, pi),
+    breaks = c(-pi, -pi / 2, 0, pi / 2),
+    labels = NULL,
+    expand = expansion(mult = 0)
+  ) +
+  scale_y_continuous(
+    limits = c(0, 1.2),
+    breaks = c(0, 0.4, 0.8)
+  ) +
+  annotate(
+    "text",
+    x = c(-pi, -pi / 2, 0, pi / 2),
+    y = 0.95,
+    label = c("-pi", "-pi/2", "0", "pi/2"),
+    parse = TRUE,
+    size = 3
+  ) +
+  coord_polar(theta = "x", start = -pi, direction = 1) +
+  labs(x = "Angle (radians)", y = NULL)
+
+p1 + p2
+```
+
+## Inverting the von Mises CDF
+
+For the same distribution with $\mu = 0$ and $\kappa = 5$,
+$$
+  F(x) = \int_{-\pi}^x f(t)\,\mathrm{d}t, \qquad x \in [-\pi, \pi].
+$$
+
+\medskip\pause
+
+We can evaluate $F$ by numerically integrating the density `dvm`:
+
+```{r}
+#| label: vonmises-numerical-cdf
+
+pvm <- function(x, kappa = 5) {
+  integrate(
+    function(t) dvm(t, kappa),
+    lower = -pi,
+    upper = x,
+    rel.tol = 1e-10
+  )$value
+}
+```
+
+\medskip\pause
+
+There is no elementary inverse CDF. We solve $F(x) - u = 0$ numerically.
+
+## Sampling by Solving $F(x) = U$
+
+To sample from this von Mises distribution, draw $U \sim \mathcal{U}(0, 1)$,
+then solve $F(x) - U = 0$.
+
+\medskip\pause
+
+For one draw, suppose $u = 0.9$.
+
+::: {.columns}
+::::: {.column width="50%"}
+```{r}
+#| label: inversion-numerical-root
+
+u <- 0.9
+sample_x <- uniroot(
+  function(x) pvm(x) - u,
+  interval = c(-pi, pi),
+  tol = 1e-8
+)$root
+sample_x
+```
+:::::
+::::: {.column width="50%"}
+```{r}
+#| label: inversion-numerical-bracket
+#| echo: false
+#| fig-width: 2.5
+#| fig-height: 1.7
+
+vm_cdf <- tibble(
+  x = seq(-pi, pi, length.out = 200),
+  cdf = vapply(x, pvm, numeric(1))
+)
+
+ggplot(vm_cdf, aes(x)) +
+  geom_line(aes(y = cdf - u), color = "royalblue") +
+  geom_hline(
+    yintercept = 0,
+    linetype = "dashed",
+    color = "grey50"
+  ) +
+  annotate("point", x = sample_x, y = 0, color = "darkorange") +
+  annotate(
+    "text",
+    x = 1.75,
+    y = -0.5,
+    label = paste0(
+      "atop(x == F^{-1} * '(",
+      u,
+      ")', x %~~% ",
+      round(sample_x, 3),
+      ")"
+    ),
+    parse = TRUE,
+    size = 3
+  ) +
+  scale_x_continuous(
+    breaks = c(-pi, 0, pi),
+    labels = expression(-pi, 0, pi)
+  ) +
+  labs(x = expression(x), y = expression(F(x) - u))
+```
+:::::
+:::
+
+\medskip\pause
+
+Each new draw requires another solve, with numerical integration at each CDF
+evaluation.
+
+\pdfpcnote{
+  The interval $[-\pi, \pi]$ brackets the root for every $u \in (0, 1)$ because
+  $F(-\pi) = 0$ and $F(\pi) = 1$.
+  This simple implementation integrates the density at each root-finding step.
+  Specialized CDF approximations or a precomputed inverse can reduce the cost.
+}
+
+## Sampling Directly from the von Mises Density
+
+We can now sample by numerical inversion. Evaluating the unnormalized density
+$$
+  q(x) = e^{\kappa \cos(x-\mu)}
+$$
+is much simpler than computing the CDF.
+
+. . .
+
+### Sampling Problem {.alert}
+
+Can we sample using $q$ directly, without computing or inverting the CDF?
+
+\medskip\pause
+
+Yes! We can use **rejection sampling**.
+
+## Rejection Sampling
+
+We want to sample from a target density $f$ using a proposal density $g$ that we
+can sample from easily.
+
+\medskip\pause
+
+Let $Y_1, Y_2, \ldots$ be i.i.d. with density $g$ on $\mathbb{R}$ and
+$U_1, U_2, \ldots$ be i.i.d. $\mathcal{U}(0, 1)$, with the two sequences
+independent.
+
+\medskip\pause
+
+Define
+$$
+  \sigma
+  = \inf\left\{ n \geq 1 \mid U_n \leq \alpha \frac{f(Y_n)}{g(Y_n)} \right\},
+$$
+for $\alpha \in (0, 1]$, where $f$ is a density.
+
+. . .
+
+### Theorem
+
+If $f(y) \leq g(y)/\alpha$ for all $y \in \mathbb{R}$, then the distribution of
+$Y_\sigma$ has density $f$.
+
+\medskip\pause
+
+$\alpha$ is the **acceptance probability** and $g(y)/\alpha$ the **envelope** of
+$f$.
+
+##
+
+```{r}
+#| label: rejection-sampling-ggplot
+#| echo: false
+#| fig-height: 2.5
+#| fig-width: 5
+#| fig-cap: Rejection sampling for a normal target truncated to $(0, 9)$, using
+#|   a uniform proposal. Points have height $U g(Y)/\alpha$.
+
+set.seed(1)
+N <- 1000
+y <- runif(N, 0, 9)
+u <- runif(N, 0, 0.43)
+target <- function(x) {
+  ifelse(
+    x > 0 & x < 9,
+    dnorm(x, 5, 1) / (pnorm(9, 5, 1) - pnorm(0, 5, 1)),
+    0
+  )
+}
+envelope <- function(x) rep(0.43, length(x))
+
+accepted <- u <= target(y)
+df <- data.frame(y = y, u = u, accepted = accepted)
+
+curve_df <- data.frame(
+  x = seq(0, 9, length.out = 200),
+  target = target(seq(0, 9, length.out = 200)),
+  envelope = envelope(seq(0, 9, length.out = 200))
+)
+
+ggplot() +
+  geom_line(data = curve_df, aes(x = x, y = envelope)) +
+  geom_area(
+    data = curve_df,
+    aes(x = x, y = target),
+    col = "black",
+    fill = "grey90"
+  ) +
+  geom_point(
+    data = df,
+    aes(x = y, y = u, color = accepted),
+    size = 0.5
+  ) +
+  scale_color_manual(
+    values = c("red", "steelblue2"),
+    labels = c("Rejected", "Accepted")
+  ) +
+  labs(x = "y", y = "Density", color = NULL) +
+  theme_minimal() +
+  theme(legend.position = "right")
+```
+
+## Why Rejection Sampling Works
+
+For one proposal $Y \sim g$, let $A = \{U \leq \alpha f(Y)/g(Y)\}$ be the
+acceptance event.
+
+\medskip\pause
+
+Writing $F$ for the target CDF,
+$$
+  \Pr(Y \leq x, A) = \int_{-\infty}^x g(y)\frac{\alpha f(y)}{g(y)}\,\mathrm{d}y
+                   = \alpha F(x).
+$$
+
+. . .
+
+Taking $x \to \infty$ gives $\Pr(A) = \alpha$. Therefore,
+$$
+  \Pr(Y \leq x \mid A) = \frac{\Pr(Y \leq x, A)}{\Pr(A)}
+                       = \frac{\alpha F(x)}{\alpha} = F(x).
+$$
+
+. . .
+
+Each accepted proposal has the target distribution. Fresh independent attempts
+give the first accepted proposal, $Y_\sigma$, this same distribution.
+
+## The Number of Proposals
+
+Each attempt succeeds with probability $\alpha$, independently:
+$$
+  \Pr(\sigma = n) = (1 - \alpha)^{n-1}\alpha, \qquad n = 1, 2, \ldots.
+$$
+
+. . .
+
+```{r}
+#| label: rejection-geometric-cost
+#| echo: false
+#| fig-width: 5
+#| fig-height: 1.7
+
+proposal_counts <- tidyr::expand_grid(
+  n = 1:25,
+  alpha = c(0.2, 0.8)
+) |>
+  mutate(
+    probability = dgeom(n - 1, alpha),
+    label = paste("alpha ==", alpha)
+  )
+
+ggplot(proposal_counts, aes(n, probability)) +
+  geom_segment(aes(xend = n, yend = 0), color = "royalblue") +
+  facet_wrap(~label, labeller = "label_parsed") +
+  labs(x = expression(n), y = expression(Pr(sigma == n)))
+```
+
+. . .
+
+$\sigma$ counts attempts **including the accepted one**:
+$\mathbb{E}[\sigma] = 1/\alpha$.
+
+\medskip
+
+Stopping at the $N$th acceptance takes $N/\alpha$ proposals on average.
+
+## Normalizing Constants
+
+Rejection sampling works with unnormalized densities!
+
+\medskip\pause
+
+Suppose:
+
+- Target: $f(y) = c q(y)$ (unknown $c$)
+- Proposal: $g(y) = d p(y)$ (can sample from $g$, unknown $d$)
+
+\medskip\pause
+
+Acceptance test:
+$$
+  U \leq \frac{\alpha f(y)}{g(y)} = \frac{\alpha c q(y)}{d p(y)}
+$$
+
+\medskip\pause
+
+If $\alpha = \frac{\alpha' d}{c}$, then
+$$
+  \frac{\alpha f(y)}{g(y)} = \frac{\alpha' q(y)}{p(y)}
+$$
+
+\pause
+
+### Takeaway
+
+You do not need to know $c$ or $d$!
+
+## How to Find $\alpha'$?
+
+Given functions $q$ and $p$, we need to find $\alpha'$ such that
+$$
+  \alpha' q(y) \leq p(y) \quad \text{for all } y.
+$$
+
+\medskip\pause
+
+### How?
+
+We can try to solve the problem
+$$
+  \alpha'_{\max} = \inf_{y: q(y)>0} \frac{p(y)}{q(y)}.
+$$
+
+We need $0 < \alpha' \leq \alpha'_{\max}$.
+
+\medskip\pause
+
+An analytic bound guarantees validity.
+
+\medskip\pause
+
+Numerical optimization (e.g., `optimize()` in R) can suggest a bound, but the
+envelope inequality must hold everywhere.
+
+## Finding the von Mises Bound
+
+For $\mu = 0$, take $q(y) = e^{\kappa\cos y}$ and $p(y) = 1$ on $(-\pi,\pi)$.
+
+```{r}
+#| label: vonmises-bound
+#| echo: false
+#| fig-show: animate
+#| fig-width: 4
+#| fig-height: 2.4
+
+bound_curve <- tibble(y = seq(-pi, pi, length.out = 401)) |>
+  mutate(tight_bound = exp(2 * (cos(y) - 1)))
+
+bound_scales <- c(0.5, 1, 1.25)
+bound_labels <- c(
+  "Valid, with room to spare",
+  "Largest valid value",
+  "Invalid"
+)
+
+for (stage in 1:3) {
+  bound_color <- if (stage < 3) "royalblue" else "darkorange"
+  p <- ggplot(
+    bound_curve,
+    aes(y, bound_scales[stage] * tight_bound)
+  ) +
+    geom_hline(
+      yintercept = 1,
+      color = "grey40",
+      linetype = "dashed"
+    ) +
+    geom_line(color = bound_color) +
+    annotate(
+      "point",
+      x = 0,
+      y = bound_scales[stage],
+      color = bound_color
+    ) +
+    annotate(
+      "text",
+      x = -2.9,
+      y = 1.2,
+      label = "p(y) == 1",
+      parse = TRUE,
+      hjust = 0
+    ) +
+    scale_x_continuous(
+      breaks = c(-pi, 0, pi),
+      labels = expression(-pi, 0, pi)
+    ) +
+    coord_cartesian(ylim = c(0, 1.4)) +
+    labs(
+      title = bound_labels[stage],
+      subtitle = bquote(
+        kappa == 2 ~
+          "," ~
+          alpha^minute ==
+            .(bound_scales[stage]) *
+              e^{
+                -kappa
+              }
+      ),
+      x = expression(y),
+      y = expression(alpha^minute * q(y))
+    )
+  print(p)
+}
+```
+
+\uncover<2->{Since $\cos y \leq 1$,
+$\alpha'_{\max} = \inf_y e^{-\kappa\cos y} = e^{-\kappa}$, attained at $y = 0$.}
+
+## Von Mises Rejection Sampling
+
+For $\mu = 0$, use the uniform proposal on $(-\pi, \pi)$: $g(y) = 1/(2\pi)$.
+
+\medskip\pause
+
+Since
+$$
+  e^{\kappa(\cos(y)-1)} = \alpha' e^{\kappa \cos(y)} \leq 1,
+$$
+where $\alpha' = \exp(-\kappa)$, we reject if
+$$
+  U > e^{\kappa(\cos(Y)-1)}.
+$$
+
+. . .
+
+\begin{algorithm}[H]
+  \caption{Rejection sampling for the von Mises distribution}
+  \Repeat{sample is accepted}{
+    Generate $Y \sim \mathcal{U}(-\pi, \pi)$\;
+    Generate $U \sim \mathcal{U}(0, 1)$\;
+    \If{$U \leq e^{\kappa(\cos(Y) - 1)}$}{
+      Accept $Y$\;
+    }
+  }
+\end{algorithm}
+
+## Compute the Acceptance Test on the Log Scale
+
+The same rejection test can be written as
+$$
+  \log U \leq \log\alpha' + \log q(Y) - \log p(Y).
+$$
+
+\medskip\pause
+
+For the posterior in Assignment 2A, compute the log-density as a sum:
+
+```{r}
+#| label: posterior-log-density
+
+log_q <- function(theta, x, z) {
+  if (theta < 0) {
+    return(-Inf)
+  }
+  eta <- theta * x
+  sum(z * eta - exp(eta))
+}
+```
+
+\pause
+
+Multiplying many small likelihood contributions can underflow to zero. Work with
+log-densities and subtract them before exponentiating, if needed.
+
+\medskip\pause
+
+For von Mises sampling, the log acceptance ratio is simply $\kappa(\cos Y - 1)$.
+
+## Pitfalls: Missing Support
+
+Take a standard normal target $f$ and a $\mathcal{U}(-2,2)$ proposal $g$.
+
+```{r}
+#| label: rejection-missing-support
+#| echo: false
+#| fig-width: 5
+#| fig-height: 2
+#| fig-cap: The uniform proposal cannot cover the normal target. No finite
+#|   multiple of the proposal can envelope the target.
+
+support_densities <- tibble(x = seq(-4, 4, length.out = 500)) |>
+  mutate(target = dnorm(x), proposal = dunif(x, -2, 2))
+
+ggplot(support_densities, aes(x)) +
+  geom_line(aes(y = target, color = "Target")) +
+  geom_line(aes(y = proposal, color = "Proposal")) +
+  scale_color_manual(
+    name = NULL,
+    values = c(Target = "royalblue", Proposal = "darkorange"),
+    breaks = c("Target", "Proposal")
+  ) +
+  guides(color = guide_legend(position = "top", nrow = 1)) +
+  labs(x = expression(y), y = "Density")
+```
+
+. . .
+
+Here $g(y) = 0$ for $|y| > 2$, where $f(y) > 0$. No finite multiple of $g$ can
+cover $f$.
+
+## Pitfalls: Tails Too Light
+
+Take a standard normal target $f$ and a $\mathcal{N}(0,1/4)$ proposal $g$. Both
+densities are positive on $\mathbb{R}$.
+
+```{r}
+#| label: rejection-light-tails
+#| echo: false
+#| fig-width: 5.5
+#| fig-height: 1.8
+#| fig-cap: The normal proposal has lighter tails than the target. No finite
+#|   multiple of the proposal can envelope the target.
+
+tail_densities <- tibble(x = seq(-4, 4, length.out = 500)) |>
+  mutate(
+    target = dnorm(x),
+    proposal = dnorm(x, sd = 0.5),
+    log_ratio = dnorm(x, log = TRUE) -
+      dnorm(x, sd = 0.5, log = TRUE)
+  )
+
+density_plot <- ggplot(tail_densities, aes(x)) +
+  geom_line(aes(y = target, color = "Target")) +
+  geom_line(aes(y = proposal, color = "Proposal")) +
+  scale_color_manual(
+    name = NULL,
+    values = c(Target = "royalblue", Proposal = "darkorange"),
+    breaks = c("Target", "Proposal")
+  ) +
+  guides(color = guide_legend(position = "top", nrow = 1)) +
+  labs(title = "Densities", x = expression(y), y = "Density")
+
+ratio_plot <- ggplot(tail_densities, aes(x, log_ratio)) +
+  geom_line(color = "grey30") +
+  geom_hline(
+    yintercept = log(10),
+    linetype = "dashed",
+    color = "grey60"
+  ) +
+  annotate(
+    "text",
+    x = 0,
+    y = 5.6,
+    label = "log(M)==log(10)",
+    parse = TRUE,
+    size = 3
+  ) +
+  labs(
+    title = "Log density ratio",
+    x = expression(y),
+    y = expression(log(f(y) / g(y)))
+  )
+
+density_plot + ratio_plot
+```
+
+. . .
+
+$$
+  \log\frac{f(y)}{g(y)} = -\log 2 + \frac{3}{2}y^2
+                        \longrightarrow \infty \quad\text{as } |y|
+                        \longrightarrow \infty.
+$$
+
+. . .
+
+No finite $M$ satisfies $f(y) \leq M g(y)$ for every $y$.
+
+\pdfpcnote{
+  The dashed line illustrates $M = 10$. An envelope would require the entire
+  log-ratio curve to lie below $\log M$. Increasing $M$ raises the line, but
+  the quadratic eventually exceeds any finite height.
+  This failure relies on the unbounded normal target. A Gaussian proposal
+  can envelope the bounded von Mises density on $[-\pi, \pi]$, though the
+  required constant may be large.
+}
+
+## Implementing the von Mises Sampler
+
+```{r}
+#| label: vMsim-slow
+
+get_one_sample_vmises <- function(kappa) {
+  repeat {
+    Y <- runif(1, -pi, pi)
+    U <- runif(1)
+    if (log(U) <= kappa * (cos(Y) - 1)) {
+      break
+    }
+  }
+  Y
+}
+```
+
+. . .
+
+```{r}
+#| label: vMsim-slow2
+
+sample_vonmises_slow <- function(N, kappa) {
+  replicate(N, get_one_sample_vmises(kappa))
+}
+```
+
+##
+
+```{r}
+#| label: vMsim2
+#| fig-width: 5.4
+#| fig-height: 3
+#| echo: false
+#| fig-cap: Histogram of samples from `sample_vonmises_slow()`, with theoretical
+#|   density overlaid.
+
+f <- function(y, kappa) {
+  exp(kappa * cos(y)) / (2 * pi * besselI(kappa, 0))
+}
+
+# Simulate data
+x1 <- sample_vonmises_slow(100000, 0.5)
+x2 <- sample_vonmises_slow(100000, 2)
+
+df <- tibble(
+  x = c(x1, x2),
+  kappa = factor(rep(c(0.5, 2), each = 100000))
+)
+
+ggplot(df, aes(x)) +
+  geom_histogram(
+    aes(y = after_stat(density)),
+    bins = 30,
+    fill = "grey60",
+    color = "white"
+  ) +
+  stat_function(
+    fun = f,
+    args = list(kappa = 0.5),
+    color = "steelblue3",
+    data = data.frame(
+      x = seq(-pi, pi, length.out = 200),
+      kappa = 0.5
+    )
+  ) +
+  stat_function(
+    fun = f,
+    args = list(kappa = 2),
+    color = "steelblue3",
+    data = data.frame(
+      x = seq(-pi, pi, length.out = 200),
+      kappa = 2
+    )
+  ) +
+  labs(y = "Density", x = "x") +
+  facet_wrap(~kappa, ncol = 2, labeller = "label_both")
+```
+
+##
+
+```{r}
+#| label: profile-vsim
+#| echo: false
+#| eval: false
+
+source(here::here("R", "vmises-sim-slow.R"))
+profvis(sample_vonmises_slow(100000, 5))
+```
+
+![A line profile of the naive von Mises sampling
+implementation.](../images/vmises-slow-profiling.png){width=82%}
+
+## Findings from Profiling
+
+The bottleneck is the repeated calls to `runif(1)`.
+
+\medskip\pause
+
+Both loop overhead and calling the RNG for one number at a time add cost.
+
+\medskip\pause
+
+It is faster to generate random numbers in batches and store them in vectors.
+
+\medskip\pause
+
+But how can we do that for rejection sampling with an \alert{unknown} number of
+rejections?
+
+## Vectorized (but Random Length) Rejection Sampler
+
+We can speed up the rejection sampler by generating $m$ proposal samples at
+once.
+
+```{r}
+#| label: vM-rejection-vec
+
+fixed_vonmises_sampler <- function(m, kappa) {
+  Y <- runif(m, -pi, pi)
+  u <- runif(m)
+  accept <- log(u) <= kappa * (cos(Y) - 1)
+  Y[accept]
+}
+```
+
+. . .
+
+Simple and fast, but returns a **random** number of samples!
+
+\medskip\pause
+
+We need a function that returns exactly $N$ samples. We can estimate $\alpha$ to
+choose batch sizes without computing it in advance.
+
+## How Many Samples Does a Batch Return?
+
+We want **100 accepted samples**. How many proposals should we generate?
+
+\medskip\pause
+
+Suppose $\alpha = 0.2$. From $m$ independent proposals, the accepted count is
+$$
+  B_m \sim \mathrm{Binomial}(m,\alpha), \qquad \mathbb{E}[B_m] = m\alpha.
+$$
+
+```{r}
+#| label: rejection-binomial-batches
+#| echo: false
+#| fig-width: 5
+#| fig-height: 1.9
+
+batch_counts <- tidyr::expand_grid(
+  count = 60:170,
+  m = c(500, 600)
+) |>
+  mutate(
+    probability = dbinom(count, m, 0.2),
+    enough = count >= 100,
+    label = sprintf(
+      "m = %d: %.0f%% reach 100",
+      m,
+      100 * pbinom(99, m, 0.2, lower.tail = FALSE)
+    )
+  )
+
+ggplot(batch_counts, aes(count, probability, color = enough)) +
+  geom_segment(aes(xend = count, yend = 0)) +
+  geom_vline(xintercept = 100, linetype = "dashed") +
+  scale_color_manual(
+    values = c("darkorange", "royalblue"),
+    guide = "none"
+  ) +
+  facet_wrap(~label) +
+  labs(x = "Accepted samples", y = "Probability")
+```
+
+. . .
+
+$m = 100/0.2 = 500$ gives 100 accepted samples **on average**. If a batch falls
+short, generate another batch.
+
+##
+
+\begin{algorithm}[H]
+  \caption{Sampling exactly $N$ values via rejection sampling with unknown
+    acceptance probability $\alpha$.}
+  $\widehat{\alpha} \gets 1$\;
+  $\symbf{y} \gets$ empty vector\;
+  $n_\text{accepted} \gets 0$\;
+  \While{$n_\text{accepted} < N$}{
+    $m \gets \lceil (N - n_\text{accepted}) / \widehat{\alpha} \rceil$\;
+    Generate $m$ proposals and apply the rejection test\;
+    $\symbf{y}_\text{new} \gets$ accepted proposals\;
+    $n_\text{accepted} \gets n_\text{accepted} +$ length$(\symbf{y}_\text{new})$\;
+    \If{$\symbf{y}$ is empty}{
+      $\widehat{\alpha} \gets (n_\text{accepted} + 1) / (m + 1)$ \tcp*[f]{Keep the estimate positive.}
+    }
+    Append $\symbf{y}_\text{new}$ to $\symbf{y}$\;
+  }
+  \KwRet{$\symbf{y}_{1:N}$}
+\end{algorithm}
+
+```{r}
+#| label: new_rejection_sampler
+#| echo: false
+
+new_rejection_sampler <- function(generator) {
+  function(N, ...) {
+    alpha <- 1
+    y <- numeric(0)
+    n_accepted <- n_proposed <- 0
+    while (n_accepted < N) {
+      m <- ceiling((N - n_accepted) / alpha)
+      y_new <- generator(m, ...)
+      n_proposed <- n_proposed + m
+      n_accepted <- n_accepted + length(y_new)
+      if (length(y) == 0) {
+        alpha <- (n_accepted + 1) / (m + 1)
+      }
+      y <- c(y, y_new)
+    }
+    list(
+      x = y[seq_len(N)],
+      proposed = n_proposed,
+      accepted = n_accepted
+    )
+  }
+}
+```
+
+## Sampling with movMF
+
+We can compare our samplers with the implementation in `movMF`.
+
+\medskip\pause
+
+For $\mu = 0$, use the parameter vector $(\kappa, 0)$. The package returns
+points on the unit circle, which we convert to angles.
+
+```{r}
+#| label: vMsim
+
+library(movMF)
+
+sample_vonmises_movMF <- function(N, kappa) {
+  xy <- rmovMF(N, c(kappa, 0))
+  # atan2 preserves the quadrant of each point on the unit circle.
+  atan2(xy[, 2], xy[, 1])
+}
+
+x <- sample_vonmises_movMF(500, 5)
+```
+
+##
+
+```{r}
+#| label: vMhist
+#| fig-height: 2.5
+#| fig-width: 5.5
+#| echo: false
+#| fig-cap: Histogram of samples from `rmovMF()` for $\mu = 0$ and $\kappa = 5$,
+#|   with the theoretical density in blue.
+
+ggplot(tibble(x = x), aes(x)) +
+  geom_rug(alpha = 0.1) +
+  geom_histogram(
+    aes(y = after_stat(density)),
+    bins = 15,
+    fill = "grey70",
+    color = "white"
+  ) +
+  stat_function(
+    fun = f,
+    args = list(kappa = 5),
+    color = "royalblue"
+  ) +
+  labs(y = "Density", x = "x")
+```
+
+## Check the von Mises Samplers Before Timing
+
+Each sampler should reproduce the von Mises CDF with $\mu = 0$ and $\kappa = 5$.
+
+```{r}
+#| label: vmises-sampler-setup
+#| include: false
+
+sample_vonmises <- new_rejection_sampler(fixed_vonmises_sampler)
+
+sample_vonmises_inversion <- function(N, kappa) {
+  vapply(
+    runif(N),
+    function(u) {
+      uniroot(
+        function(x) pvm(x, kappa) - u,
+        interval = c(-pi, pi),
+        tol = 1e-8
+      )$root
+    },
+    numeric(1)
+  )
+}
+```
+
+```{r}
+#| label: vmises-validation
+#| echo: false
+#| fig-width: 5.5
+#| fig-height: 2.3
+#| fig-cap: $N = 1000$ draws per method. The target CDF is evaluated by
+#|   numerical integration.
+
+set.seed(510)
+vm_validation_n <- 1000
+vm_validation_samples <- tibble(
+  `Numerical inversion` = sample_vonmises_inversion(
+    vm_validation_n,
+    5
+  ),
+  `Scalar rejection` = sample_vonmises_slow(vm_validation_n, 5),
+  `Vectorized rejection` = sample_vonmises(vm_validation_n, 5)$x,
+  movMF = sample_vonmises_movMF(vm_validation_n, 5)
+) |>
+  pivot_longer(
+    everything(),
+    names_to = "method",
+    values_to = "x"
+  ) |>
+  mutate(method = factor(method, levels = unique(method)))
+
+vm_reference_cdf <- tibble(x = seq(-pi, pi, length.out = 201)) |>
+  mutate(cdf = vapply(x, pvm, numeric(1), kappa = 5))
+
+ggplot(vm_validation_samples, aes(x)) +
+  stat_ecdf(aes(color = "Empirical")) +
+  geom_line(
+    data = vm_reference_cdf,
+    aes(y = cdf, color = "Target"),
+    linetype = "dashed"
+  ) +
+  scale_color_manual(
+    name = NULL,
+    values = c(Empirical = "royalblue", Target = "black"),
+    breaks = c("Empirical", "Target")
+  ) +
+  guides(color = guide_legend(position = "top", nrow = 1)) +
+  scale_x_continuous(
+    breaks = c(-pi, 0, pi),
+    labels = expression(-pi, 0, pi)
+  ) +
+  facet_wrap(~method, ncol = 2) +
+  labs(x = expression(theta), y = "CDF")
+```
+
+. . .
+
+The empirical CDFs agree with the target. Next, compare the time per draw.
+
+\pdfpcnote{
+  Small deviations are expected with finite samples. The CDF comparison checks
+  the marginal distribution. It does not establish independence between draws
+  or replace the mathematical justification of each sampler.
+}
+
+## Benchmarking the von Mises Samplers
+
+Each method returns $N = 1000$ angles with $\mu = 0$ and $\kappa = 5$.
+
+```{r}
+#| label: vmises-bench-setup
+#| echo: false
+
+vm_benchmark_n <- 1000
+```
+
+```{r}
+#| label: vmises-bench
+#| fig-width: 5
+#| fig-height: 2.1
+#| fig-cap: Median time per returned sample over five runs, on a logarithmic
+#|   scale.
+#| echo: false
+
+set.seed(514)
+vm_bench <- bench::mark(
+  inversion = sample_vonmises_inversion(vm_benchmark_n, 5),
+  scalar = sample_vonmises_slow(vm_benchmark_n, 5),
+  vectorized = sample_vonmises(vm_benchmark_n, 5)$x,
+  movMF = sample_vonmises_movMF(vm_benchmark_n, 5),
+  check = FALSE
+)
+
+vm_timings <- tibble(
+  method = factor(
+    as.character(vm_bench$expression),
+    levels = c("movMF", "vectorized", "scalar", "inversion"),
+    labels = c(
+      "movMF",
+      "Vectorized rejection",
+      "Scalar rejection",
+      "Numerical inversion"
+    )
+  ),
+  microseconds = 1e6 *
+    as.numeric(vm_bench$median) /
+    vm_benchmark_n
+)
+
+ggplot(vm_timings, aes(microseconds, method)) +
+  geom_point(
+    aes(color = method == "Numerical inversion"),
+    size = 2
+  ) +
+  scale_color_manual(
+    values = c("FALSE" = "royalblue", "TRUE" = "darkorange"),
+    guide = "none"
+  ) +
+  scale_x_log10(labels = scales::label_number()) +
+  labs(x = "Time per sample (microseconds)", y = NULL)
+```
+
+\pause
+
+Repeated integration and root finding make this direct inversion sampler
+expensive.
+
+\pdfpcnote{
+  Numerical inversion uses the earlier CDF implementation with integration
+  tolerance $10^{-10}$ and root-finding tolerance $10^{-8}$.
+  Each timed call returns 1000 angles, including random-number generation and
+  all numerical work. Timings include garbage collection.
+  This compares these implementations: specialized CDF approximations or a
+  precomputed inverse can make inversion sampling much faster.
+}
+
+## Piecewise Exponential Envelopes
+
+::: {.columns}
+::::: {.column width="47%"}
+When $f$ is positive and *log-concave* on an interval $I$, we can construct an
+integrable envelope of the form
+$$
+  f(x) \leq e^{V(x)}
+$$
+where
+$$
+  V(x) = \sum_{i=1}^m (a_i x + b_i) \symbf{1}_{I_i}(x)
+$$
+for intervals $I_i$ forming a partition of $I$.
+:::::
+
+::::: {.column width="47%"}
+```{r}
+#| label: log-concave-envelope-general
+#| echo: false
+
+library(ggplot2)
+
+curve_fun <- function(x) dnorm(x)
+log_curve <- function(x) dnorm(x, log = TRUE)
+
+# Tangent points
+x1 <- -1.5
+x2 <- 1.5
+
+# Compute tangent lines in log-space
+slope1 <- -x1
+intercept1 <- log_curve(x1) - slope1 * x1
+slope2 <- -x2
+intercept2 <- log_curve(x2) - slope2 * x2
+
+xseq <- seq(-3, 3, length.out = 400)
+envelope_log <- ifelse(
+  xseq < 0,
+  slope1 * xseq + intercept1,
+  slope2 * xseq + intercept2
+)
+envelope <- exp(envelope_log)
+
+df <- data.frame(
+  x = xseq,
+  curve = curve_fun(xseq),
+  envelope = envelope
+)
+
+ggplot(df, aes(x)) +
+  geom_line(aes(y = curve), color = "grey60") +
+  geom_line(aes(y = envelope)) +
+  geom_point(aes(x = x1, y = curve_fun(x1))) +
+  geom_point(aes(x = x2, y = curve_fun(x2))) +
+  scale_y_continuous(
+    transform = scales::log_trans(),
+    labels = scales::label_math(e^.x, format = log)
+  ) +
+  labs(y = "Density") +
+  theme_minimal()
+```
+:::::
+:::
+
+\bigskip\pause
+
+Typically, $a_i x + b_i$ is tangent to the graph of $\log(f)$ at
+$x_i \in I_i = (z_{i-1}, z_i]$ for
+$$
+  z_0 < x_1 < z_1 < x_2 < \ldots < z_{m-1} < x_m < z_m.
+$$
+
+## Why Tangents Give Upper Bounds
+
+If $h = \log f$ is differentiable and concave, then
+$$
+  h(x) \leq h(x_i) + h'(x_i)(x - x_i) = a_i x + b_i.
+$$
+
+```{r}
+#| label: envelope-tangent-bounds
+#| echo: false
+#| fig-show: animate
+#| fig-width: 5
+#| fig-height: 2.1
+
+normal_log_tangent <- function(x, at) {
+  dnorm(at, log = TRUE) - at * (x - at)
+}
+
+tangent_example <- tibble(x = seq(-3, 3, length.out = 401)) |>
+  mutate(
+    log_density = dnorm(x, log = TRUE),
+    left = normal_log_tangent(x, -1.5),
+    right = normal_log_tangent(x, 1.5),
+    envelope = pmin(left, right)
+  )
+
+for (stage in 1:2) {
+  p <- ggplot(tangent_example, aes(x)) +
+    geom_line(aes(y = log_density), color = "grey50") +
+    geom_line(aes(y = left), color = "royalblue") +
+    annotate(
+      "point",
+      x = -1.5,
+      y = dnorm(-1.5, log = TRUE),
+      color = "royalblue"
+    ) +
+    coord_cartesian(ylim = c(-5.5, 2)) +
+    labs(x = expression(x), y = expression(h(x)))
+  if (stage >= 2) {
+    p <- p +
+      geom_line(aes(y = right), color = "darkorange") +
+      annotate(
+        "point",
+        x = 1.5,
+        y = dnorm(1.5, log = TRUE),
+        color = "darkorange"
+      )
+  }
+  print(p)
+}
+```
+
+Choose $a_i = h'(x_i)$ and $b_i = h(x_i) - a_i x_i$. Exponentiating gives
+$f(x) \leq e^{a_i x+b_i}$.
+
+## Where Should the Pieces Meet?
+
+Use the smallest tangent bound at each point: $V(x) = \min_i\{a_i x + b_i\}$.
+
+```{r}
+#| label: envelope-tangent-intersections
+#| echo: false
+#| fig-show: animate
+#| fig-width: 5
+#| fig-height: 1.9
+
+for (stage in 1:2) {
+  p <- ggplot(tangent_example, aes(x)) +
+    geom_line(aes(y = log_density), color = "grey50") +
+    geom_line(
+      aes(y = left),
+      color = "royalblue",
+      linetype = "dashed"
+    ) +
+    geom_line(
+      aes(y = right),
+      color = "darkorange",
+      linetype = "dashed"
+    ) +
+    geom_vline(xintercept = 0, color = "grey70") +
+    coord_cartesian(ylim = c(-5.5, 2)) +
+    labs(x = expression(x), y = expression(h(x)))
+  if (stage >= 2) {
+    p <- p + geom_line(aes(y = envelope))
+  }
+  print(p)
+}
+```
+
+Adjacent tangents meet at
+$$
+  z_i = \frac{b_{i+1} - b_i}{a_i - a_{i+1}} \qquad (a_i \neq a_{i+1}).
+$$
+Here $z_1 = 0$. Keep the blue tangent to the left and the orange tangent to the
+right.
+
+## Sampling from the Envelope
+
+For each piece $I_i = (L_i,R_i]$, compute its finite mass
+$$
+  w_i = \int_{L_i}^{R_i} e^{a_i x+b_i}\,\mathrm{d}x, \qquad C = \sum_i w_i.
+$$
+
+. . .
+
+Choose a piece $J$ with $\Pr(J = i) = w_i/C$.
+
+\begin{center}
+\begin{tikzpicture}[node distance=0.6cm, >=stealth]
+  \node[draw, rounded corners, fill=blue!10] (piece) {Choose $J$};
+  \node[draw, rounded corners, fill=orange!10, right=of piece] (draw) {Draw $Y$ in $I_J$};
+  \node[draw, rounded corners, fill=green!10, right=of draw] (test) {Rejection test};
+  \draw[->] (piece) -- (draw);
+  \draw[->] (draw) -- (test);
+\end{tikzpicture}
+\end{center}
+
+. . .
+
+Given $J = i$ and $a_i \neq 0$, draw $U \sim \mathcal{U}(0,1)$ and set
+$$
+  Y = \frac{1}{a_i}\log\!\left[ (1 - U)e^{a_i L_i} + Ue^{a_i R_i} \right].
+$$
+Use endpoint limits for infinite bounds. If $a_i = 0$, sample uniformly on the
+finite interval.
+
+\medskip\pause
+
+This gives $g(y) = e^{V(y)}/C$. Accept with probability $f(y)/e^{V(y)}$.
+
+## Beta Distribution
+
+For shape parameters $\alpha, \beta > 1$, the beta density is log-concave.
+
+```{r}
+#| echo: false
+#| fig-width: 5.5
+#| fig-height: 2.5
+
+fixed_beta_sampler <- function(m, x1, x2, alpha, beta) {
+  lf <- function(x) (alpha - 1) * log(x) + (beta - 1) * log1p(-x)
+  lf_deriv <- function(x) (alpha - 1) / x - (beta - 1) / (1 - x)
+  a1 <- lf_deriv(x1)
+  a2 <- lf_deriv(x2)
+  if (a1 == 0 || a2 == 0 || a1 - a2 == 0) {
+    stop(
+      "\nThe implementation requires a_1 and a_2 different and both different from zero. Choose different values of x_1 and x_2.",
+      call. = FALSE
+    )
+  }
+  b1 <- lf(x1) - a1 * x1
+  b2 <- lf(x2) - a2 * x2
+  z1 <- (b2 - b1) / (a1 - a2)
+  Q1 <- exp(b1) * (exp(a1 * z1) - 1) / a1
+  c <- Q1 + exp(b2) * (exp(a2 * 1) - exp(a2 * z1)) / a2
+
+  y <- log_ratio <- numeric(m)
+  uy <- c * runif(m)
+  u <- runif(m)
+  i <- uy < Q1
+  y[i] <- z <- log(a1 * exp(-b1) * uy[i] + 1) / a1
+  y[!i] <- zz <- log(
+    a2 * exp(-b2) * (uy[!i] - Q1) + exp(a2 * z1)
+  ) /
+    a2
+  log_ratio[i] <- lf(z) - a1 * z - b1
+  log_ratio[!i] <- lf(zz) - a2 * zz - b2
+  accept <- log(u) <= log_ratio
+  y[accept]
+}
+
+sample_beta <- new_rejection_sampler(fixed_beta_sampler)
+```
+
+```{r}
+#| label: Beta-fig
+#| fig-cap: Samples from a piecewise exponential envelope sampler, with
+#|   densities (blue) and envelopes (orange) overlaid.
+#| fig-width: 5.5
+#| fig-height: 2.65
+#| echo: false
+
+params <- data.frame(
+  x1 = c(0.3, 0.3, 0.2, 0.2),
+  x2 = c(0.7, 0.7, 0.5, 0.5),
+  alpha = c(4, 1.8, 4, 1.8),
+  beta = c(2, 2.4, 2, 2.4),
+  label = c(
+    "x1=0.3, x2=0.7, alpha=4, beta=2",
+    "x1=0.3, x2=0.7, alpha=1.8, beta=2.4",
+    "x1=0.2, x2=0.5, alpha=4, beta=2",
+    "x1=0.2, x2=0.5, alpha=1.8, beta=2.4"
+  )
+)
+
+make_beta_df <- function(N, x1, x2, alpha, beta, label) {
+  x <- sample_beta(
+    N,
+    x1 = x1,
+    x2 = x2,
+    alpha = alpha,
+    beta = beta
+  )$x
+  data.frame(x = x, label = label)
+}
+
+sample_df <- do.call(
+  rbind,
+  lapply(
+    seq_len(nrow(params)),
+    function(i) {
+      with(
+        params[i, ],
+        make_beta_df(100000, x1, x2, alpha, beta, label)
+      )
+    }
+  )
+)
+
+xseq <- seq(0, 1, length.out = 400)
+
+make_density_df <- function(xseq, alpha, beta, label) {
+  data.frame(
+    x = xseq,
+    density = xseq^(alpha - 1) *
+      (1 - xseq)^(beta - 1) /
+      beta(alpha, beta),
+    label = label
+  )
+}
+
+make_envelope_df <- function(xseq, x1, x2, alpha, beta, label) {
+  envelope <- function(x, x1, x2, alpha, beta) {
+    lf <- function(x) {
+      (alpha - 1) * log(x) + (beta - 1) * log1p(-x)
+    }
+    lf_deriv <- function(x) {
+      (alpha - 1) / x - (beta - 1) / (1 - x)
+    }
+    a1 <- lf_deriv(x1)
+    a2 <- lf_deriv(x2)
+    b1 <- lf(x1) - a1 * x1
+    b2 <- lf(x2) - a2 * x2
+    z1 <- (b2 - b1) / (a1 - a2)
+    ifelse(x < z1, exp(a1 * x + b1), exp(a2 * x + b2))
+  }
+  data.frame(
+    x = xseq,
+    envelope = envelope(xseq, x1, x2, alpha, beta) /
+      beta(alpha, beta),
+    label = label
+  )
+}
+
+dens_df <- do.call(
+  rbind,
+  lapply(
+    seq_len(nrow(params)),
+    function(i) {
+      with(
+        params[i, ],
+        make_density_df(xseq, alpha, beta, label)
+      )
+    }
+  )
+)
+env_df <- do.call(
+  rbind,
+  lapply(
+    seq_len(nrow(params)),
+    function(i) {
+      with(
+        params[i, ],
+        make_envelope_df(xseq, x1, x2, alpha, beta, label)
+      )
+    }
+  )
+)
+
+ggplot(sample_df, aes(x)) +
+  geom_histogram(
+    aes(y = after_stat(density)),
+    bins = 50,
+    fill = "grey80"
+  ) +
+  geom_line(
+    data = dens_df,
+    aes(x = x, y = density),
+    color = "steelblue3"
+  ) +
+  geom_line(
+    data = env_df,
+    aes(x = x, y = envelope),
+    color = "dark orange"
+  ) +
+  coord_cartesian(ylim = c(0, 3)) +
+  facet_wrap(~label, ncol = 2)
+```
+
+##
+
+```{r}
+#| label: beta-envelopes
+#| echo: false
+#| warning: false
+#| fig-width: 5.5
+#| fig-height: 3
+#| fig-cap: Theoretical densities (blue) and envelopes (orange) for different
+#|   parameter values and choices of $x_1$ and $x_2$.
+
+params <- data.frame(
+  alpha = c(4, 1.8),
+  beta = c(2, 2.4),
+  x1 = c(0.3, 0.2),
+  x2 = c(0.7, 0.5),
+  label = c(
+    "alpha=4, beta=2, x1=0.3, x2=0.7",
+    "alpha=1.8, beta=2.4, x1=0.2, x2=0.5"
+  )
+)
+
+xseq <- seq(0.05, 0.95, length.out = 400)
+
+make_df <- function(xseq, alpha, beta, x1, x2, label) {
+  envelope_fun <- function(x, x1, x2, alpha, beta) {
+    lf <- function(x) {
+      (alpha - 1) * log(x) + (beta - 1) * log1p(-x)
+    }
+    lf_deriv <- function(x) {
+      (alpha - 1) / x - (beta - 1) / (1 - x)
+    }
+    a1 <- lf_deriv(x1)
+    a2 <- lf_deriv(x2)
+    b1 <- lf(x1) - a1 * x1
+    b2 <- lf(x2) - a2 * x2
+    z1 <- (b2 - b1) / (a1 - a2)
+    ifelse(x < z1, exp(a1 * x + b1), exp(a2 * x + b2))
+  }
+  data.frame(
+    x = xseq,
+    density = xseq^(alpha - 1) *
+      (1 - xseq)^(beta - 1) /
+      beta(alpha, beta),
+    envelope = envelope_fun(xseq, x1, x2, alpha, beta) /
+      beta(alpha, beta),
+    label = label
+  )
+}
+
+plot_df <- do.call(
+  rbind,
+  lapply(
+    seq_len(nrow(params)),
+    function(i) {
+      with(
+        params[i, ],
+        make_df(xseq, alpha, beta, x1, x2, label)
+      )
+    }
+  )
+)
+
+ggplot(plot_df, aes(x = x)) +
+  geom_line(aes(y = density), color = "steelblue3") +
+  geom_line(aes(y = envelope), color = "dark orange") +
+  scale_y_log10() +
+  facet_wrap(~label, ncol = 2)
+```
+
+## Adapting the Envelope
+
+The examples above use fixed envelopes. Adaptive rejection sampling updates the
+envelope using new points.
+
+\medskip\pause
+
+For a fixed envelope, a simple cost model is
+$$
+  \mathbb{E}[T] \approx T_{\mathrm{setup}}
+                        + \frac{N}{\alpha}\,c_{\mathrm{attempt}},
+$$
+where $c_{\mathrm{attempt}}$ includes generating and testing a proposal.
+
+\medskip\pause
+
+Batching reduces overhead per proposal. A tighter envelope reduces rejections,
+but constructing, sampling, and updating it also cost time.
+
+## One Adaptive Update
+
+```{r}
+#| label: envelope-adaptive-update
+#| echo: false
+#| fig-show: animate
+#| fig-width: 5
+#| fig-height: 2.1
+#| fig-cap: For a log-concave target, use a rejected proposal $Y$ as a new
+#|   tangent point.
+
+adaptive_example <- tangent_example |>
+  mutate(
+    new_tangent = normal_log_tangent(x, 0),
+    updated = pmin(envelope, new_tangent)
+  )
+
+for (stage in 1:3) {
+  p <- ggplot(adaptive_example, aes(x)) +
+    geom_line(aes(y = exp(log_density))) +
+    geom_line(aes(y = exp(envelope)), color = "royalblue") +
+    coord_cartesian(ylim = c(0, 1.3)) +
+    labs(x = expression(x), y = "Density")
+  if (stage >= 2) {
+    p <- p +
+      annotate("point", x = 0, y = 0.9, color = "darkorange") +
+      annotate(
+        "text",
+        x = 1.1,
+        y = 0.95,
+        label = "Rejected at Y = 0"
+      )
+  }
+  if (stage >= 3) {
+    p <- p +
+      geom_line(aes(y = exp(updated)), color = "darkorange")
+  }
+  print(p)
+}
+```
+
+$$
+  V_{\mathrm{new}}(x) = \min\{V_{\mathrm{old}}(x),\ h(Y) + h'(Y)(x - Y)\}.
+$$
+\uncover<3->{The orange envelope is tighter. Update the piece masses before the
+next draw.}
+
+## Does a Tighter Envelope Run Faster?
+
+```{r}
+#| label: envelope-benchmark-helpers
+#| include: false
+#| fig-cap: >
+#|   Compare uniform and two-piece exponential proposals for
+#|   $\mathrm{Beta}(a,a)$. Larger $a$ concentrates the target near $1/2$.
+
+compare_rejection_pair <- function(N, uniform, piecewise) {
+  draws <- list(uniform = uniform(N), piecewise = piecewise(N))
+  timings <- bench::mark(
+    uniform = uniform(N)$x,
+    piecewise = piecewise(N)$x,
+    check = FALSE,
+    min_iterations = 10,
+    min_time = 0.1
+  )
+  methods <- as.character(timings$expression)
+  tibble(
+    method = methods,
+    acceptance = vapply(
+      draws[methods],
+      function(draw) draw$accepted / draw$proposed,
+      numeric(1)
+    ),
+    microseconds = 1e6 * as.numeric(timings$median) / N
+  )
+}
+
+plot_envelope_comparison <- function(results, x_label) {
+  results |>
+    pivot_longer(
+      c(acceptance, microseconds),
+      names_to = "metric",
+      values_to = "value"
+    ) |>
+    mutate(
+      metric = factor(
+        metric,
+        levels = c("acceptance", "microseconds"),
+        labels = c("Acceptance", "Time")
+      )
+    ) |>
+    ggplot(aes(parameter, value, color = method)) +
+    geom_line() +
+    geom_point() +
+    facet_grid(
+      metric ~ N,
+      scales = "free_y",
+      labeller = labeller(N = function(x) paste("N =", x))
+    ) +
+    scale_x_continuous(
+      breaks = sort(unique(results$parameter))
+    ) +
+    scale_color_manual(
+      values = c(
+        piecewise = "darkorange",
+        uniform = "royalblue"
+      ),
+      labels = c(piecewise = "Piecewise", uniform = "Uniform")
+    ) +
+    labs(x = x_label, y = NULL, color = NULL)
+}
+
+fixed_beta_uniform_sampler <- function(m, shape) {
+  log_target <- function(x) (shape - 1) * (log(x) + log1p(-x))
+  y <- runif(m)
+  log_ratio <- log_target(y) - log_target(0.5)
+  y[log(runif(m)) <= log_ratio]
+}
+
+sample_beta_uniform <- new_rejection_sampler(
+  fixed_beta_uniform_sampler
+)
+
+set.seed(511)
+beta_comparison <- pmap_dfr(
+  expand_grid(N = c(100, 10000), shape = c(2, 5, 20)),
+  function(N, shape) {
+    # Points one standard deviation from the mode follow its concentration.
+    delta <- sqrt(1 / (4 * (2 * shape + 1)))
+    compare_rejection_pair(
+      N,
+      uniform = function(n) sample_beta_uniform(n, shape),
+      piecewise = function(n) {
+        sample_beta(n, 0.5 - delta, 0.5 + delta, shape, shape)
+      }
+    ) |>
+      mutate(N = N, parameter = shape)
+  }
+)
+```
+
+```{r}
+#| label: beta-envelope-benchmark
+#| echo: false
+#| fig-width: 5.5
+#| fig-height: 2.25
+
+plot_envelope_comparison(beta_comparison, expression(a))
+```
+
+\pause
+
+Time is median microseconds per returned sample, including setup and all
+batches. Acceptance is accepted/proposed, including surplus draws.
+
+\pdfpcnote{
+  The uniform envelope has height equal to the beta density at its mode, 1/2.
+  For the piecewise envelope, place tangent points one standard deviation
+  either side of 1/2. The acceptance proportions come from separate sampler
+  runs; the timings are medians over repeated runs. A higher acceptance rate
+  need not give a lower runtime.
+}
+
+## Transformation Methods vs. Rejection Sampling
+
+::: {.columns}
+::::: {.column width="47%"}
+### Transformation Methods
+
+Transform samples from a simple distribution to the target distribution.
+
+\medskip\pause
+
+Efficient if the transformation is available and cheap to compute.
+
+\medskip\pause
+
+Finding or evaluating a transformation can be difficult for complex or
+unnormalized distributions.
+:::::
+
+. . .
+
+::::: {.column width="47%"}
+### Rejection Sampling
+
+Uses a proposal distribution and accepts/rejects samples.
+
+\medskip\pause
+
+Works even if the quantile function is unavailable or expensive.
+
+\medskip\pause
+
+Efficiency depends on the proposal and acceptance probability.
+
+\medskip\pause
+
+Works with unnormalized densities, but acceptance can be very low in high
+dimensions.
+:::::
+:::
+
+. . .
+
+### Takeaway {.example}
+
+Use a simple transformation when available. Otherwise, consider rejection
+sampling with a suitable envelope.
+
+## Exercises
+
+### Exercise 1
+
+For a positive integer $k$, use the fact that
+$$
+  W = X_1^2 + \ldots + X_k^2 \sim \chi^2_k \quad \text{for} \quad X_1,
+  \ldots, X_k \sim_{\text{i.i.d.}} \mathcal{N}(0, 1)
+$$
+to implement a function, `my_rchisq()`, such that `my_rchisq(N, k)` returns a
+sample of $N$ i.i.d. observations from $\chi^2_k$.
+
+```{r}
+#| label: rchisq2-implementation
+#| include: false
+
+my_rchisq <- function(N, k) {
+  y <- numeric(N)
+  for (i in seq_len(N)) {
+    x <- rnorm(k)
+    y[i] <- sum(x^2)
+  }
+  y
+}
+```
+
+```{r}
+#| label: rchisq2-implementation-faster
+#| include: false
+
+my_fast_rchisq <- function(N, k) {
+  x <- matrix(rnorm(k * N), k)
+  colSums(x^2)
+}
+```
+
+. . .
+
+### Exercise 2
+
+Make another function, `my_other_rchisq()`, that uses inversion sampling.
+
+```{r}
+#| label: rchisq2
+#| include: false
+
+my_other_rchisq <- function(N, k) {
+  x <- runif(N)
+  qchisq(x, k)
+}
+```
+
+. . .
+
+Check the output distributions, then benchmark your implementations against one
+another and `rchisq()`.
+
+```{r}
+#| label: rchisq-bench
+#| include: false
+
+N <- 1e4
+k <- 5
+bench::mark(
+  rchisq(N, k),
+  my_rchisq(N, k),
+  my_fast_rchisq(N, k),
+  my_other_rchisq(N, k),
+  check = FALSE
+) |>
+  plot()
+```
+
+## Summary
+
+### Transformation Methods
+
+- Transform samples from a simpler distribution to the target
+  distribution.\pause
+- Inversion uses the target's quantile function to transform uniform
+  samples.\pause
+- Efficient if the transformation is available and cheap to compute.\pause
+
+### Rejection Sampling
+
+- Use a proposal distribution and accept/reject samples.\pause
+- Works even if the quantile function is unavailable or expensive.
+
+## Next Time
+
+### Monte Carlo Integration
+
+Sample from a distribution to estimate expectations of functions of the random
+variable.
+
+### Importance Sampling
+
+Weight samples from a proposal distribution to estimate expectations with
+respect to a target distribution.
+
+\lectureappendix
+
+# Appendix
+
+## Von Mises Envelopes
+
+::: {.columns}
+::::: {.column width="47%"}
+For $\mu = 0$ and $\kappa > 0$, the von Mises density is not globally
+log-concave.
+
+\medskip\pause
+
+Since $(\log f)''(x) = -\kappa\cos(x)$, it is
+
+- log-concave on $(-\pi/2, \pi/2)$ and
+- log-convex on $(-\pi,-\pi/2)$ and $(\pi/2, \pi)$.
+
+\medskip\pause
+
+Use tangents in the center and chords in the tails to bound $\log f$.
+:::::
+
+::::: {.column width="47%"}
+```{r}
+#| echo: false
+#| fig-cap: The von Mises log-density with $\mu = 0$ and $\kappa = 0.5$.
+
+dvm <- function(x, k) exp(k * cos(x)) / (2 * pi * besselI(k, 0))
+
+xy <- tibble(
+  x = seq(-pi, pi, length.out = 400),
+  y = log(dvm(x, 0.5))
+)
+
+ggplot(xy, aes(x = x, y = y)) +
+  geom_vline(
+    xintercept = c(-pi, -pi / 2, pi / 2, pi),
+    color = "grey60"
+  ) +
+  geom_line() +
+  labs(y = "log-density") +
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+  )
+```
+:::::
+:::
+
+##
+
+```{r}
+#| label: vonmises-adaptive
+#| echo: false
+
+dvm <- function(x, k) exp(k * cos(x)) / (2 * pi * besselI(k, 0))
+
+von_mises_adapt_random <- function(N, x1, x2, kappa) {
+  lf <- function(x) kappa * cos(x)
+  lf_deriv <- function(x) -kappa * sin(x)
+  a1 <- 2 * kappa / pi
+  a2 <- lf_deriv(x1)
+  a3 <- lf_deriv(x2)
+  a4 <- -a1
+
+  b1 <- kappa
+  b2 <- lf(x1) - a2 * x1
+  b3 <- lf(x2) - a3 * x2
+  b4 <- kappa
+
+  z0 <- -pi
+  z1 <- -pi / 2
+  z2 <- (b3 - b2) / (a2 - a3)
+  z3 <- pi / 2
+  z4 <- pi
+
+  Q1 <- exp(b1) * (exp(a1 * z1) - exp(a1 * z0)) / a1
+  Q2 <- Q1 + exp(b2) * (exp(a2 * z2) - exp(a2 * z1)) / a2
+  Q3 <- Q2 + exp(b3) * (exp(a3 * z3) - exp(a3 * z2)) / a3
+  c <- Q3 + exp(b4) * (exp(a4 * z4) - exp(a4 * z3)) / a4
+
+  u0 <- c * runif(N)
+  u <- runif(N)
+
+  I1 <- (u0 < Q1)
+  I2 <- (u0 >= Q1) & (u0 < Q2)
+  I3 <- (u0 >= Q2) & (u0 < Q3)
+  I4 <- (u0 >= Q3)
+
+  x <- numeric(N)
+  accept <- logical(N)
+  x[I1] <- log(a1 * exp(-b1) * u0[I1] + exp(a1 * z0)) / a1
+  accept[I1] <- log(u[I1]) <= lf(x[I1]) - a1 * x[I1] - b1
+  x[I2] <- log(a2 * exp(-b2) * (u0[I2] - Q1) + exp(a2 * z1)) / a2
+  accept[I2] <- log(u[I2]) <= lf(x[I2]) - a2 * x[I2] - b2
+  x[I3] <- log(a3 * exp(-b3) * (u0[I3] - Q2) + exp(a3 * z2)) / a3
+  accept[I3] <- log(u[I3]) <= lf(x[I3]) - a3 * x[I3] - b3
+  x[I4] <- log(a4 * exp(-b4) * (u0[I4] - Q3) + exp(a4 * z3)) / a4
+  accept[I4] <- log(u[I4]) <= lf(x[I4]) - a4 * x[I4] - b4
+
+  x[accept]
+}
+
+von_mises_adapt <- new_rejection_sampler(von_mises_adapt_random)
+
+envelope <- function(x, x1, x2, kappa) {
+  lf <- function(x) kappa * cos(x)
+  lf_deriv <- function(x) -kappa * sin(x)
+  a1 <- 2 * kappa / pi
+  a2 <- lf_deriv(x1)
+  a3 <- lf_deriv(x2)
+  a4 <- -a1
+
+  b1 <- kappa
+  b2 <- lf(x1) - a2 * x1
+  b3 <- lf(x2) - a3 * x2
+  b4 <- kappa
+
+  z0 <- -pi
+  z1 <- -pi / 2
+  z2 <- (b3 - b2) / (a2 - a3)
+  z3 <- pi / 2
+  z4 <- pi
+
+  env <- numeric(length(x))
+  i1 <- x < z1
+  i2 <- x >= z1 & x < z2
+  i3 <- x >= z2 & x < z3
+  i4 <- x >= z3
+
+  env[i1] <- exp(a1 * x[i1] + b1)
+  env[i2] <- exp(a2 * x[i2] + b2)
+  env[i3] <- exp(a3 * x[i3] + b3)
+  env[i4] <- exp(a4 * x[i4] + b4)
+
+  env
+}
+```
+
+```{r}
+#| label: vonmises-adaptive-plot
+#| fig-cap: Von Mises samples from a piecewise exponential envelope sampler,
+#|   with densities (blue) and envelopes (orange) overlaid.
+#| fig-width: 5.5
+#| fig-height: 3
+#| echo: false
+
+params <- data.frame(
+  x1 = c(-0.4, -0.1, -0.4, -1),
+  x2 = c(0.4, 0.1, 0.4, 1),
+  kappa = c(5, 5, 2, 2),
+  label = c(
+    "kappa=5, x1=-0.4, x2=0.4",
+    "kappa=5, x1=-0.1, x2=0.1",
+    "kappa=2, x1=-0.4, x2=0.4",
+    "kappa=2, x1=-1, x2=1"
+  )
+)
+
+make_vm_df <- function(N, x1, x2, kappa, label) {
+  x <- von_mises_adapt(N, x1, x2, kappa)$x
+  data.frame(x = x, label = label)
+}
+
+sample_df <- do.call(
+  rbind,
+  lapply(
+    seq_len(nrow(params)),
+    function(i) {
+      with(params[i, ], make_vm_df(100000, x1, x2, kappa, label))
+    }
+  )
+)
+
+xseq <- seq(-pi, pi, length.out = 400)
+
+make_density_df <- function(xseq, kappa, label) {
+  data.frame(x = xseq, density = dvm(xseq, kappa), label = label)
+}
+
+make_envelope_df <- function(xseq, x1, x2, kappa, label) {
+  env <- envelope(xseq, x1, x2, kappa) /
+    (2 * pi * besselI(kappa, 0))
+  data.frame(x = xseq, envelope = env, label = label)
+}
+
+dens_df <- do.call(
+  rbind,
+  lapply(
+    seq_len(nrow(params)),
+    function(i) {
+      with(params[i, ], make_density_df(xseq, kappa, label))
+    }
+  )
+)
+env_df <- do.call(
+  rbind,
+  lapply(
+    seq_len(nrow(params)),
+    function(i) {
+      with(
+        params[i, ],
+        make_envelope_df(xseq, x1, x2, kappa, label)
+      )
+    }
+  )
+)
+
+ggplot(sample_df, aes(x)) +
+  geom_histogram(
+    aes(y = after_stat(density)),
+    bins = 30,
+    fill = "grey80"
+  ) +
+  geom_line(
+    data = dens_df,
+    aes(x = x, y = density),
+    color = "steelblue3"
+  ) +
+  geom_line(
+    data = env_df,
+    aes(x = x, y = envelope),
+    color = "dark orange"
+  ) +
+  coord_cartesian(ylim = c(0, 1.5)) +
+  facet_wrap(~label, ncol = 2)
+```
+
+## Comparing the von Mises Envelopes
+
+Compare the uniform proposal with the four-piece envelope. Use central tangent
+points $\pm\min(1,\kappa^{-1/2})$ to follow the target's concentration.
+
+```{r}
+#| label: vonmises-envelope-benchmark
+#| echo: false
+#| fig-width: 5.5
+#| fig-height: 2.25
+
+set.seed(512)
+vonmises_comparison <- pmap_dfr(
+  expand_grid(N = c(100, 10000), kappa = c(0.5, 5, 20)),
+  function(N, kappa) {
+    delta <- min(1, 1 / sqrt(kappa))
+    compare_rejection_pair(
+      N,
+      uniform = function(n) sample_vonmises(n, kappa),
+      piecewise = function(n) {
+        von_mises_adapt(n, -delta, delta, kappa)
+      }
+    ) |>
+      mutate(N = N, parameter = kappa)
+  }
+)
+plot_envelope_comparison(vonmises_comparison, expression(kappa))
+```
+
+\pause
+
+These envelopes stay fixed during sampling. Time is median microseconds per
+returned sample, including setup and all batches. Compare both rows as $N$ and
+$\kappa$ change.

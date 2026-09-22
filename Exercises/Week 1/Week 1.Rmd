@@ -1,0 +1,29 @@
+---
+title: "Week 1 - CompStat"
+author: "Valdemar Schaaf - CLF125"
+date: "`r Sys.Date()`"
+output: html_notebook
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+```
+
+# Week 1
+
+## Exercise A.1 
+Explain the result of evaluating the following R expression.
+```{r}
+(0.1 + 0.1 + 0.1) > 0.3
+```
+
+## Exercise A.2
+Write a function that takes a numeric vector x and a threshold value h as arguments and returns the vector of all values in x greater than h. Test the function on seq(0, 1, 0.1) with threshold 0.3. Have the example from Exercise A.1 in mind
+
+
+## Exercise 1
+Write a function \texttt{make_point(x,y)}

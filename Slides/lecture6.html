@@ -1,0 +1,1569 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.10.18">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>Monte Carlo Integration and Importance Sampling</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="lecture6_files/libs/clipboard/clipboard.min.js"></script>
+<script src="lecture6_files/libs/quarto-html/quarto.js" type="module"></script>
+<script src="lecture6_files/libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="lecture6_files/libs/quarto-html/popper.min.js"></script>
+<script src="lecture6_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="lecture6_files/libs/quarto-html/anchor.min.js"></script>
+<link href="lecture6_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="lecture6_files/libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="lecture6_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="lecture6_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="lecture6_files/libs/bootstrap/bootstrap-917079515d91bccb85b543faf8aa8bb6.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-chtml.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+</head>
+
+<body class="fullcontent quarto-light">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Monte Carlo Integration and Importance Sampling</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="today" class="level2">
+<h2 class="anchored" data-anchor-id="today">Today</h2>
+<section id="monte-carlo-methods" class="level3">
+<h3 class="anchored" data-anchor-id="monte-carlo-methods">Monte Carlo Methods</h3>
+<p>General class of methods for estimating integrals and means.</p>
+<p>Rejection sampling is a type of Monte Carlo method.</p>
+<p>. . .</p>
+</section>
+<section id="importance-sampling" class="level3">
+<h3 class="anchored" data-anchor-id="importance-sampling">Importance Sampling</h3>
+<p>Focus on integrating functions and estimating means.</p>
+<p>Useful when we cannot analytically compute the integral.</p>
+<p>It is also a variance reduction technique.</p>
+</section>
+</section>
+<section id="monte-carlo-methods-1" class="level2">
+<h2 class="anchored" data-anchor-id="monte-carlo-methods-1">Monte Carlo Methods</h2>
+<section id="basic-simple-idea" class="level3">
+<h3 class="anchored" data-anchor-id="basic-simple-idea">Basic, Simple Idea</h3>
+<p>Use random sampling to obtain numerical results.</p>
+<p>Useful when analytical solutions are infeasible.</p>
+<p>. . .</p>
+</section>
+<section id="monte-carlo-integration" class="level3">
+<h3 class="anchored" data-anchor-id="monte-carlo-integration">Monte Carlo Integration</h3>
+<p>With <span class="math inline">\(X_1, \ldots, X_N\)</span> i.i.d. with density <span class="math inline">\(f\)</span> and <span class="math inline">\(\operatorname{E}|h(X_1)| &lt; \infty\)</span>, <span class="math display">\[
+  \hat{\mu}_{\mathrm{MC}} = \frac{1}{N} \sum_{i=1}^N h(X_i) \rightarrow \mu
+                          = \operatorname{E}h(X_1) = \int h(x) f(x) \ \mathrm{d}x
+\]</span> for <span class="math inline">\(N \to \infty\)</span> by the law of large numbers (LLN).</p>
+</section>
+</section>
+<section id="monte-carlo-integration-1" class="level2">
+<h2 class="anchored" data-anchor-id="monte-carlo-integration-1">Monte Carlo Integration</h2>
+<p>If <span class="math inline">\(\sigma^2_{\mathrm{MC}} &lt; \infty\)</span>, the central limit theorem (CLT) gives <span class="math display">\[
+  \frac{1}{N} \sum_{i=1}^N h(X_i) \overset{\mathrm{approx}}
+  \sim \mathcal{N}(\mu, \sigma^2_{\mathrm{MC}} / N)
+\]</span> where <span class="math display">\[
+  \sigma^2_{\mathrm{MC}} = \V h(X_1) = \int (h(x) - \mu)^2 f(x) \ \mathrm{d}x.
+\]</span></p>
+<p>. . .</p>
+<p>We can estimate <span class="math inline">\(\sigma^2_{\mathrm{MC}}\)</span> using the empirical variance <span class="math display">\[
+  \hat{\sigma}^2_{\mathrm{MC}}
+  = \frac{1}{N - 1} \sum_{i=1}^N (h(X_i) - \hat{\mu}_{\mathrm{MC}})^2,
+\]</span> then the variance of <span class="math inline">\(\hat{\mu}_{\mathrm{MC}}\)</span> is estimated as <span class="math inline">\(\hat{\sigma}^2_{\mathrm{MC}} / N\)</span> and an approximate 95% confidence interval for <span class="math inline">\(\mu\)</span> is <span class="math display">\[
+  \hat{\mu}_{\mathrm{MC}} \pm 1.96 \frac{\hat{\sigma}_{\mathrm{MC}}}{\sqrt{N}}.
+\]</span></p>
+</section>
+<section id="example-gamma-distribution" class="level2">
+<h2 class="anchored" data-anchor-id="example-gamma-distribution">Example: Gamma Distribution</h2>
+<div class="columns">
+<div class="column" style="width:47%;">
+<p>We want to estimate the mean of a <span class="math inline">\(\mathrm{Gamma}(8,1)\)</span> distribution.</p>
+<p>. . .</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>B <span class="ot">&lt;-</span> <span class="dv">1000</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>x <span class="ot">&lt;-</span> <span class="fu">rgamma</span>(B, <span class="dv">8</span>)</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>mu_hat <span class="ot">&lt;-</span> <span class="fu">cumsum</span>(x) <span class="sc">/</span> <span class="dv">1</span><span class="sc">:</span>B</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>sigma_hat <span class="ot">&lt;-</span> <span class="fu">sd</span>(x)</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>mu_hat[B] <span class="co"># Theoretical: 8</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] 8.096</code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>sigma_hat <span class="co"># Theoretical: sqrt(8)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] 2.862</code></pre>
+</div>
+</div>
+</div><div class="column" style="width:47%;">
+<div class="cell">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="lecture6_files/figure-html/gamma-fig-1.png" class="img-fluid figure-img" width="672"></p>
+<figcaption>Density of a Gamma(8,1) distribution with mean indicated.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section id="section" class="level2">
+<h2 class="anchored" data-anchor-id="section"></h2>
+<div class="cell">
+<div class="cell-output cell-output-stderr">
+<pre><code>Coordinate system already present.
+ℹ Adding new coordinate system, which will replace the
+  existing one.</code></pre>
+</div>
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="lecture6_files/figure-html/gamma-fig1-1.png" class="img-fluid figure-img" width="480"></p>
+<figcaption>Convergence of the Monte Carlo estimate of the mean of a Gamma(8,1) distribution.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="choosing-the-sample-size" class="level2">
+<h2 class="anchored" data-anchor-id="choosing-the-sample-size">Choosing the Sample Size</h2>
+<p>Monte Carlo standard errors decrease as <span class="math inline">\(1 / \sqrt{N}\)</span>: halving the error requires four times as many samples.</p>
+<p>Use a pilot run to estimate the variance and plan a with a fixed sample size: <span class="math display">\[
+  N
+  \approx \left( \frac{1.96\,\hat{\sigma}_{\mathrm{pilot}}}{\varepsilon} \right)^2.
+\]</span></p>
+<p>. . .</p>
+<p>This targets a 95% confidence-interval half-width of <span class="math inline">\(\varepsilon\)</span>.</p>
+</section>
+<section id="importance-sampling-1" class="level2">
+<h2 class="anchored" data-anchor-id="importance-sampling-1">Importance Sampling</h2>
+<p>When we are only interested in Monte Carlo integration, we do not need to sample from the target distribution.</p>
+<p>. . .</p>
+<section id="basic-idea" class="level3">
+<h3 class="anchored" data-anchor-id="basic-idea">Basic Idea</h3>
+<p>Some regions of the target distribution are often more important than others.</p>
+<p>So let’s these regions, but correct for this by the samples.</p>
+<p>We want to find <span class="math inline">\(\mu = \operatorname{E}h(X)\)</span>. Observe that <span class="math display">\[
+  \mu = \int h(x) f(x) \ \mathrm{d}x
+      = \int h(x) \frac{f(x)}{g(x)} g(x) \ \mathrm{d}x
+      = \int h(x) w^*(x) g(x) \ \mathrm{d}x
+\]</span> whenever <span class="math inline">\(g\)</span> is a density satisfying <span class="math display">\[
+  g(x) = 0 \Rightarrow f(x) = 0.
+\]</span></p>
+</section>
+</section>
+<section id="weights" class="level2">
+<h2 class="anchored" data-anchor-id="weights">Weights</h2>
+<p>With <span class="math inline">\(X_1, \ldots, X_N\)</span> i.i.d. with density <span class="math inline">\(g\)</span>, define the <em>weights</em> <span class="math display">\[
+  w^*(X_i) = \frac{f(X_i)}{g(X_i)}.
+\]</span></p>
+<p>. . .</p>
+<p><span class="math inline">\(g\)</span> is the <em>importance</em> density and <span class="math inline">\(f/g\)</span> is called the <em>likelihood ratio</em>.</p>
+<p>. . .</p>
+<section id="estimator" class="level3">
+<h3 class="anchored" data-anchor-id="estimator">Estimator</h3>
+<p><span class="math display">\[
+  \hat{\mu}_{\mathrm{IS}}^* := \frac{1}{N} \sum_{i=1}^N h(X_i)w^*(X_i).
+\]</span></p>
+<p>It has mean <span class="math inline">\(\mu\)</span>.</p>
+</section>
+</section>
+<section id="section-1" class="level2">
+<h2 class="anchored" data-anchor-id="section-1"></h2>
+<div class="cell">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="lecture6_files/figure-html/importance-sampling-plot-1.png" class="img-fluid figure-img" width="480"></p>
+<figcaption>Target and importance densities with corresponding importance weights.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="gamma-importance-sampling" class="level2">
+<h2 class="anchored" data-anchor-id="gamma-importance-sampling">Gamma Importance Sampling</h2>
+<div class="columns">
+<div class="column" style="width:47%;">
+<p>Use <span class="math inline">\(X = 10 + 3T\)</span>, where <span class="math inline">\(T \sim t_3\)</span>. This proposal has heavier tails than the Gamma target.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>B <span class="ot">&lt;-</span> <span class="dv">1000</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>t <span class="ot">&lt;-</span> <span class="fu">rt</span>(B, <span class="at">df =</span> <span class="dv">3</span>)</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>x <span class="ot">&lt;-</span> <span class="dv">10</span> <span class="sc">+</span> <span class="dv">3</span> <span class="sc">*</span> t</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>g_x <span class="ot">&lt;-</span> <span class="fu">dt</span>(t, <span class="at">df =</span> <span class="dv">3</span>) <span class="sc">/</span> <span class="dv">3</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>w_star <span class="ot">&lt;-</span> <span class="fu">dgamma</span>(x, <span class="dv">8</span>) <span class="sc">/</span> g_x</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>cum_mean <span class="ot">&lt;-</span> <span class="fu">cumsum</span>(x <span class="sc">*</span> w_star)</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>mu_hat_IS <span class="ot">&lt;-</span> cum_mean <span class="sc">/</span> (<span class="dv">1</span><span class="sc">:</span>B)</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>mu_hat_IS[B]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] 7.946</code></pre>
+</div>
+</div>
+<p>Close to the theoretical value (8).</p>
+</div><p>. . .</p><div class="column" style="width:47%;">
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="lecture6_files/figure-html/gammasim-fig-1.png" class="img-fluid figure-img" width="259"></p>
+</figure>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section id="section-2" class="level2">
+<h2 class="anchored" data-anchor-id="section-2"></h2>
+<div class="cell">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="lecture6_files/figure-html/gamma-IS-fig1-1.png" class="img-fluid figure-img" width="480"></p>
+<figcaption>Convergence of the importance sampling estimate of the mean of a Gamma(8,1) distribution using a Student-t proposal with 3 degrees of freedom, location 10, and scale 3.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="importance-sampling-variance" class="level2">
+<h2 class="anchored" data-anchor-id="importance-sampling-variance">Importance Sampling Variance</h2>
+<p>Again by the LLN, assuming <span class="math inline">\(\operatorname{E}_f|h(X)| &lt; \infty\)</span>, <span class="math display">\[
+  \hat{\mu}_{\mathrm{IS}}^* \rightarrow \operatorname{E}h(X_1) w^*(X_1)
+                            = \mu \quad \text{as } N \to \infty.\pause
+\]</span> If <span class="math inline">\(\sigma^{*2}_{\mathrm{IS}} &lt; \infty\)</span>, the CLT gives <span class="math display">\[
+  \hat{\mu}_{\mathrm{IS}}^* \overset{\mathrm{approx}}
+  \sim \mathcal{N}(\mu, \sigma^{*2}_{\mathrm{IS}} / N)
+\]</span> where <span class="math display">\[
+  \sigma^{*2}_{\mathrm{IS}} = \V \big( h(X_1)w^*(X_1)\big)
+                            = \int (h(x) w^*(x) - \mu)^2 g(x) \ \mathrm{d}x.
+\]</span></p>
+</section>
+<section id="importance-sampling-variance-1" class="level2">
+<h2 class="anchored" data-anchor-id="importance-sampling-variance-1">Importance Sampling Variance</h2>
+<p>The IS variance can be estimated analogously to the MC variance, <span class="math display">\[
+  \hat{\sigma}^{*2}_{\mathrm{IS}}
+  = \frac{1}{N - 1} \sum_{i=1}^N (h(X_i)w^*(X_i) - \hat{\mu}_{\mathrm{IS}}^*)^2.
+\]</span></p>
+<p>. . .</p>
+<p>An approximate 95% confidence interval is <span class="math display">\[
+  \hat{\mu}^*_{\mathrm{IS}}
+  \pm 1.96 \frac{\hat{\sigma}^*_{\mathrm{IS}}}{\sqrt{N}}.
+\]</span></p>
+<p>We may have <span class="math inline">\(\sigma^{*2}_{\mathrm{IS}} &gt; \sigma^2_{\mathrm{MC}}\)</span> or <span class="math inline">\(\sigma^{*2}_{\mathrm{IS}} &lt; \sigma^2_{\mathrm{MC}}\)</span> depending on <span class="math inline">\(h\)</span> and <span class="math inline">\(g\)</span>.</p>
+<p>. . .</p>
+<section id="goal" class="level3">
+<h3 class="anchored" data-anchor-id="goal">Goal</h3>
+<p>Choose <span class="math inline">\(g\)</span> so that <span class="math inline">\(|h(x)| w^*(x)\)</span> becomes as constant as possible.</p>
+</section>
+</section>
+<section id="gamma-importance-sampling-1" class="level2">
+<h2 class="anchored" data-anchor-id="gamma-importance-sampling-1">Gamma Importance Sampling</h2>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>sigma_hat_IS <span class="ot">&lt;-</span> <span class="fu">sd</span>(x <span class="sc">*</span> w_star)</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>sigma_hat_IS</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] 4.216</code></pre>
+</div>
+</div>
+<p>. . .</p>
+<div class="cell">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="lecture6_files/figure-html/gamma-IS-fig2-1.png" class="img-fluid figure-img" width="432"></p>
+<figcaption>Gamma mean estimate with approximate pointwise 95% intervals.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="accounting-for-the-integrand" class="level2">
+<h2 class="anchored" data-anchor-id="accounting-for-the-integrand">Accounting for the Integrand</h2>
+<p>Suppose we want to estimate <span class="math display">\[
+  \operatorname{E}(X^4) = \int x^4 f(x) \ \mathrm{d}x = 3
+\]</span> where <span class="math inline">\(f(x)\)</span> is the standard normal density.</p>
+<p>Direct Monte Carlo samples from <span class="math inline">\(f\)</span>, placing most draws near zero.</p>
+<p>The <span class="math inline">\(x^4f(x)\)</span> peaks at <span class="math inline">\(x = \pm2\)</span> and decays to zero in the far tails. We want more draws around those peaks.</p>
+<p>Try a wider Gaussian: <span class="math inline">\(g = \mathcal{N}(0,4)\)</span>, with standard deviation <span class="math inline">\(2\)</span>. This puts more mass near <span class="math inline">\(\pm2\)</span> and reduces the variance of <span class="math inline">\(X^4f(X)/g(X)\)</span>.</p>
+</section>
+<section id="section-3" class="level2">
+<h2 class="anchored" data-anchor-id="section-3"></h2>
+<div class="columns">
+<div class="column" style="width:47%;">
+<div class="cell">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="lecture6_files/figure-html/is-normal-plot-1.png" class="img-fluid figure-img" width="672"></p>
+<figcaption>Direct MC: <span class="math inline">\(g = f = \mathcal{N}(0,1)\)</span>.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div><div class="column" style="width:47%;">
+<div class="cell">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="lecture6_files/figure-html/is-wide-normal-plot-1.png" class="img-fluid figure-img" width="672"></p>
+<figcaption>Importance sampling: <span class="math inline">\(g = \mathcal{N}(0,4)\)</span>.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+</div>
+<p>. . .</p>
+<p>For the same <span class="math inline">\(N\)</span>, the estimator variances are <span class="math display">\[
+  \V(\hat\mu_{\mathrm{MC}}) = \frac{96}{N},
+  \qquad
+  \V(\hat\mu_{\mathrm{IS}}^*) \approx \frac{7.93}{N}.
+\]</span></p>
+</section>
+<section id="the-ideal-importance-density" class="level2">
+<h2 class="anchored" data-anchor-id="the-ideal-importance-density">The Ideal Importance Density</h2>
+<p>For <span class="math inline">\(0 &lt; \operatorname{E}_f|h(X)| &lt; \infty\)</span>, the variance-minimizing density for ordinary IS is <span class="math display">\[
+  g_{\mathrm{opt}}(x) = \frac{|h(x)|f(x)}{\int |h(u)|f(u)\,\mathrm{d}u}.
+\]</span></p>
+<p>. . .</p>
+<p>If <span class="math inline">\(h \geq 0\)</span>, then <span class="math inline">\(g_{\mathrm{opt}} = hf / \mu\)</span>. Every draw gives <span class="math display">\[
+  \frac{h(X)f(X)}{g_{\mathrm{opt}}(X)} = \mu, \qquad X \sim g_{\mathrm{opt}},
+\]</span> so the estimator has .</p>
+<p>But evaluating these weights requires the normalizing constant <span class="math inline">\(\mu\)</span>, the integral we want. Use the shape of <span class="math inline">\(|h|f\)</span> to guide a practical proposal.</p>
+</section>
+<section id="normalized-weights" class="level2">
+<h2 class="anchored" data-anchor-id="normalized-weights">Normalized Weights</h2>
+<p>If <span class="math inline">\(f = c^{-1} q\)</span> with <span class="math inline">\(c\)</span> unknown<a href="#fn1" class="footnote-ref" id="fnref1" role="doc-noteref"><sup>1</sup></a> then <span class="math display">\[
+  c = \int q(x) \ \mathrm{d}x = \int \frac{q(x)}{g(x)} g(x) \ \mathrm{d}x.
+\]</span></p>
+<p>. . .</p>
+<p>And <span class="math display">\[
+  \mu
+  = \frac{\int h(x) w^*(x) g(x) \ \mathrm{d}x}{\int w^*(x) g(x) \ \mathrm{d}x},
+\]</span> where <span class="math display">\[
+  w^*(x) = \frac{q(x)}{g(x)}.
+\]</span></p>
+</section>
+<section id="is-with-normalized-weights" class="level2">
+<h2 class="anchored" data-anchor-id="is-with-normalized-weights">IS with Normalized Weights</h2>
+<p>An importance sampling estimate of <span class="math inline">\(\mu\)</span> is thus <span class="math display">\[
+  \hat{\mu}_{\mathrm{IS}}
+  = \frac{\sum_{i=1}^N h(X_i) w^*(X_i)}{\sum_{i=1}^N w^*(X_i)} \pause
+  = \sum_{i=1}^N h(X_i) w(X_i),
+\]</span> where <span class="math inline">\(w^*(X_i) = q(X_i) / g(X_i)\)</span> and <span class="math display">\[
+  w(X_i) = \frac{w^*(X_i)}{\sum_{i=1}^N w^*(X_i)}
+\]</span> are the <em>normalized weights</em>.</p>
+<p>This works regardless of the normalizing constant <span class="math inline">\(c\)</span>, and also if an unnormalized proposal density is used in the weights.</p>
+<p>The estimator is generally biased for finite <span class="math inline">\(N\)</span>, but is consistent under the support and integrability assumptions.</p>
+</section>
+<section id="gamma-sampling-with-normalized-weights" class="level2">
+<h2 class="anchored" data-anchor-id="gamma-sampling-with-normalized-weights">Gamma Sampling with Normalized Weights</h2>
+<p>Ignore the normalizing constants of the Gamma target and proposal <span class="math inline">\(10 + 3T\)</span>, <span class="math inline">\(T \sim t_3\)</span>. Set <span class="math inline">\(w^*(x) = 0\)</span> for <span class="math inline">\(x \leq 0\)</span>, and otherwise use <span class="math display">\[
+  w^*(x) = x^7 e^{-x} \left( 1 + \frac{(x - 10)^2}{27} \right)^2.
+\]</span></p>
+<p>. . .</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>B <span class="ot">&lt;-</span> <span class="dv">1000</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>x <span class="ot">&lt;-</span> <span class="dv">10</span> <span class="sc">+</span> <span class="dv">3</span> <span class="sc">*</span> <span class="fu">rt</span>(B, <span class="at">df =</span> <span class="dv">3</span>)</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>w_star <span class="ot">&lt;-</span> <span class="fu">numeric</span>(B)</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>x_pos <span class="ot">&lt;-</span> x[x <span class="sc">&gt;</span> <span class="dv">0</span>]</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>w_star[x <span class="sc">&gt;</span> <span class="dv">0</span>] <span class="ot">&lt;-</span> <span class="fu">exp</span>(</span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>  <span class="dv">2</span> <span class="sc">*</span> <span class="fu">log1p</span>((x_pos <span class="sc">-</span> <span class="dv">10</span>)<span class="sc">^</span><span class="dv">2</span> <span class="sc">/</span> <span class="dv">27</span>) <span class="sc">-</span> x_pos <span class="sc">+</span> <span class="dv">7</span> <span class="sc">*</span> <span class="fu">log</span>(x_pos)</span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>mu_hat_IS <span class="ot">&lt;-</span> <span class="fu">cumsum</span>(x <span class="sc">*</span> w_star) <span class="sc">/</span> <span class="fu">cumsum</span>(w_star)</span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>mu_hat_IS[B] <span class="co"># Theoretical value 8</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] 8.124</code></pre>
+</div>
+</div>
+</section>
+<section id="section-4" class="level2">
+<h2 class="anchored" data-anchor-id="section-4"></h2>
+<div class="cell">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="lecture6_files/figure-html/gamma-ISw-fig1-1.png" class="img-fluid figure-img" width="432"></p>
+<figcaption>Convergence of the importance sampling estimate of the mean of a Gamma(8,1) distribution using normalized weights.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="variance-for-is-with-normalized-weights" class="level2">
+<h2 class="anchored" data-anchor-id="variance-for-is-with-normalized-weights">Variance for IS with Normalized Weights</h2>
+<p>Let <span class="math inline">\(w_i = w(X_i)\)</span> be the normalized weights. If <span class="math inline">\(w^*(X)\)</span> and <span class="math inline">\(h(X)w^*(X)\)</span> have finite variances, the <span class="math inline">\(\Delta\)</span>-method gives the standard error estimate <span class="math display">\[
+  \widehat{\mathrm{se}}(\hat{\mu}_{\mathrm{IS}})
+  = \sqrt{\frac{N}{N - 1} \sum_{i=1}^N w_i^2 \big(h(X_i) - \hat{\mu}_{\mathrm{IS}}\big)^2}.
+\]</span></p>
+<p>This accounts for uncertainty in both the weighted sum and the sum of weights.</p>
+<p>An approximate 95% confidence interval is <span class="math display">\[
+  \hat{\mu}_{\mathrm{IS}}
+  \pm 1.96\,\widehat{\mathrm{se}}(\hat{\mu}_{\mathrm{IS}}).
+\]</span></p>
+<p>Normalizing constants cancel.</p>
+</section>
+<section id="gamma-normalized-weights-standard-error" class="level2">
+<h2 class="anchored" data-anchor-id="gamma-normalized-weights-standard-error">Gamma Normalized Weights: Standard Error</h2>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>w <span class="ot">&lt;-</span> w_star <span class="sc">/</span> <span class="fu">sum</span>(w_star)</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>weighted_residuals <span class="ot">&lt;-</span> w <span class="sc">*</span> (x <span class="sc">-</span> mu_hat_IS[B])</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>se_hat_IS <span class="ot">&lt;-</span> <span class="fu">sqrt</span>(B <span class="sc">/</span> (B <span class="sc">-</span> <span class="dv">1</span>) <span class="sc">*</span> <span class="fu">sum</span>(weighted_residuals<span class="sc">^</span><span class="dv">2</span>))</span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>se_hat_IS</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] 0.1025</code></pre>
+</div>
+</div>
+<p>. . .</p>
+<div class="cell">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="lecture6_files/figure-html/gamma-ISw-fig2-1.png" class="img-fluid figure-img" width="432"></p>
+<figcaption>Gamma mean estimate with approximate pointwise 95% intervals.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="when-to-use-importance-sampling" class="level2">
+<h2 class="anchored" data-anchor-id="when-to-use-importance-sampling">When to Use Importance Sampling?</h2>
+<section id="rare-events" class="level3">
+<h3 class="anchored" data-anchor-id="rare-events">Rare Events</h3>
+<p>Estimating probabilities or expectations involving rare events.</p>
+<p>. . .</p>
+</section>
+<section id="high-variance-monte-carlo" class="level3">
+<h3 class="anchored" data-anchor-id="high-variance-monte-carlo">High-Variance Monte Carlo</h3>
+<p>Importance sampling can reduce variance by focusing samples where the integrand is large.</p>
+<p>. . .</p>
+</section>
+<section id="difficult-to-sample-targets" class="level3">
+<h3 class="anchored" data-anchor-id="difficult-to-sample-targets">Difficult-to-Sample Targets</h3>
+<p>When direct sampling from the target distribution is hard, but sampling from a related importance distribution is easy.</p>
+</section>
+</section>
+<section id="poor-importance-distribution" class="level2">
+<h2 class="anchored" data-anchor-id="poor-importance-distribution">Poor Importance Distribution</h2>
+<p>If the importance distribution assigns little mass to important regions, weighted contributions can be highly variable and estimates unreliable.</p>
+<section id="remedies" class="level3">
+<h3 class="anchored" data-anchor-id="remedies">Remedies</h3>
+<p>More samples may help with poor overlap. They cannot repair missing support: if <span class="math inline">\(g = 0\)</span> where <span class="math inline">\(hf \neq 0\)</span>, ordinary IS misses part of the integral.</p>
+<p>Redesign the importance density to cover the required support and put more mass where the integrand is large. Self-normalized IS must cover the target support, including where <span class="math inline">\(h = 0\)</span>.</p>
+</section>
+</section>
+<section id="diagnostics-for-importance-sampling" class="level2">
+<h2 class="anchored" data-anchor-id="diagnostics-for-importance-sampling">Diagnostics for Importance Sampling</h2>
+<section id="weight-distribution" class="level3">
+<h3 class="anchored" data-anchor-id="weight-distribution">Weight Distribution</h3>
+<p>Plot the weights and weighted integrand values to identify extreme contributions.</p>
+<p>. . .</p>
+</section>
+<section id="effective-sample-size-ess" class="level3">
+<h3 class="anchored" data-anchor-id="effective-sample-size-ess">Effective Sample Size (ESS)</h3>
+<p>ESS summarizes weight concentration. A high ESS cannot rule out missed regions.</p>
+<p>. . .</p>
+</section>
+<section id="coefficient-of-variation-cv" class="level3">
+<h3 class="anchored" data-anchor-id="coefficient-of-variation-cv">Coefficient of Variation (CV)</h3>
+<p>CV quantifies the relative variability of the weights.</p>
+<p>. . .</p>
+</section>
+<section id="comparison-with-standard-monte-carlo" class="level3">
+<h3 class="anchored" data-anchor-id="comparison-with-standard-monte-carlo">Comparison with Standard Monte Carlo</h3>
+<p>Comparing with standard Monte Carlo shows whether importance sampling actually improves efficiency.</p>
+</section>
+</section>
+<section id="weight-degeneracies" class="level2">
+<h2 class="anchored" data-anchor-id="weight-degeneracies">Weight Degeneracies</h2>
+<div class="columns">
+<div class="column" style="width:47%;">
+<p>Suppose that <span class="math display">\[
+  X \sim \mathcal{N}(0, I_{2})
+\]</span> and that we want to estimate <span class="math inline">\(\operatorname{E}(h(X))\)</span> where <span class="math inline">\(h(X)\)</span> is large near the origin.</p>
+<p>If we use an importance density <span class="math inline">\(g(x)\)</span> from <span class="math display">\[
+  \mathcal{N}(\mu, I_{2})
+\]</span> with large <span class="math inline">\(\|\mu\|\)</span>, most samples are far from the origin, so <span class="math inline">\(h(X)\)</span> is nearly zero and weights are highly variable.</p>
+</div><div class="column" style="width:47%;">
+<div class="cell">
+<div class="cell-output cell-output-stderr">
+<pre><code>Warning: package 'mvtnorm' was built under R version 4.6.1</code></pre>
+</div>
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="lecture6_files/figure-html/poor-importance-demo-1.png" class="img-fluid figure-img" width="672"></p>
+<figcaption>Target (blue) and importance (orange) densities with samples from the importance distribution.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section id="section-5" class="level2">
+<h2 class="anchored" data-anchor-id="section-5"></h2>
+<div class="cell">
+<div class="cell-output cell-output-stderr">
+<pre><code>`stat_bin()` using `bins = 30`. Pick better value
+`binwidth`.</code></pre>
+</div>
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="lecture6_files/figure-html/weight-degeneracy-plot-1.png" class="img-fluid figure-img" width="508"></p>
+<figcaption>Histogram and boxplot of importance weights, showing weight degeneracy.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="effective-sample-size-ess-1" class="level2">
+<h2 class="anchored" data-anchor-id="effective-sample-size-ess-1">Effective Sample Size (ESS)</h2>
+<p>The weight-based effective sample size (ESS) summarizes how evenly the total weight is distributed across samples: <span class="math display">\[
+  \mathrm{ESS}
+  = \frac{1}{\sum_{i=1}^N w_i^2}
+  = \frac{\left( \sum_{i=1}^N w^*_i \right)^2}{\sum_{i=1}^N ({w^*_i})^2}
+\]</span> where <span class="math inline">\(w_i\)</span> are the importance weights.</p>
+<p>If all weights are equal, <span class="math inline">\(\mathrm{ESS} = N\)</span>. If one weight dominates, <span class="math inline">\(\mathrm{ESS} \approx 1\)</span>, which warns of possible instability.</p>
+<p>. . .</p>
+<section id="bivariate-normal-example" class="level3">
+<h3 class="anchored" data-anchor-id="bivariate-normal-example">Bivariate Normal Example</h3>
+<p>For the bivariate example, with get an ESS of about 14 out of <span class="math inline">\(N = 1000\)</span> samples.</p>
+</section>
+</section>
+<section id="coefficient-of-variation-cv-1" class="level2">
+<h2 class="anchored" data-anchor-id="coefficient-of-variation-cv-1">Coefficient of Variation (CV)</h2>
+<p>The coefficient of variation (CV) of the weights measures their relative variability.</p>
+<p>It is defined as <span class="math display">\[
+  \mathrm{CV}
+  = \frac{\sqrt{\frac{1}{N} \sum_{i=1}^N (w_i - \bar{w})^2}}{\bar{w}}
+\]</span> where <span class="math inline">\(\bar{w} = \frac{1}{N} \sum_{i=1}^N w_i\)</span> is the mean weight.</p>
+<p>. . .</p>
+<section id="interpretation" class="level3">
+<h3 class="anchored" data-anchor-id="interpretation">Interpretation</h3>
+<p>A high CV indicates uneven weights, which can make estimates unstable.</p>
+<p>CV near 0 means nearly uniform weights. Even CV below 1 (<span class="math inline">\(\mathrm{ESS} &gt; N/2\)</span>) does not guarantee accuracy: the integrand matters, and samples can miss important regions.</p>
+<p>. . .</p>
+</section>
+<section id="connection-to-ess" class="level3">
+<h3 class="anchored" data-anchor-id="connection-to-ess">Connection to ESS</h3>
+<p>There is a direct relationship between ESS and CV: <span class="math display">\[
+  \mathrm{ESS} = \frac{N}{1 + \mathrm{CV}^2}.
+\]</span></p>
+</section>
+</section>
+<section id="choosing-the-importance-distribution" class="level2">
+<h2 class="anchored" data-anchor-id="choosing-the-importance-distribution">Choosing the Importance Distribution</h2>
+<p>We want low-variance estimates of <span class="math display">\[
+  I = \int h(x) f(x) \ \mathrm{d}x
+\]</span></p>
+<p>. . .</p>
+<p>The importance distribution determines the weights <span class="math display">\[
+  w^*(x) = \frac{f(x)}{g(x)}
+\]</span> but ordinary IS variance depends on <span class="math inline">\(h(X)w^*(X)\)</span>, not just the weights. For self-normalized IS, the asymptotic variance depends on <span class="math inline">\((h(X) - \mu)w^*(X)\)</span>.</p>
+</section>
+<section id="principles-for-choosing-the-importance-distribution" class="level2">
+<h2 class="anchored" data-anchor-id="principles-for-choosing-the-importance-distribution">Principles for Choosing the Importance Distribution</h2>
+<section id="cover-the-support" class="level3">
+<h3 class="anchored" data-anchor-id="cover-the-support">Cover the Support</h3>
+<p>Require <span class="math inline">\(g(x) &gt; 0\)</span> wherever <span class="math inline">\(|h(x)|f(x) &gt; 0\)</span> for ordinary IS, and wherever <span class="math inline">\(f(x) &gt; 0\)</span> for self-normalized IS, up to sets of measure zero.</p>
+<p>. . .</p>
+</section>
+<section id="match-the-bulk" class="level3">
+<h3 class="anchored" data-anchor-id="match-the-bulk">Match the Bulk</h3>
+<p>For ordinary IS, put more mass where <span class="math inline">\(|h(x)|f(x)\)</span> is large. For self-normalized IS, the corresponding quantity is <span class="math inline">\(|h(x) - \mu|f(x)\)</span>.</p>
+<p>. . .</p>
+</section>
+<section id="give-it-heavy-enough-tails" class="level3">
+<h3 class="anchored" data-anchor-id="give-it-heavy-enough-tails">Give it Heavy-Enough Tails</h3>
+<p>Use tails heavy enough that the weighted contributions have finite variance. Heavier tails than the target are often a useful safeguard.</p>
+</section>
+</section>
+<section id="common-strategies" class="level2">
+<h2 class="anchored" data-anchor-id="common-strategies">Common Strategies</h2>
+<section id="exponential-tilting" class="level3">
+<h3 class="anchored" data-anchor-id="exponential-tilting">Exponential Tilting</h3>
+<p>Multiply the target density by an exponential factor to favor a rare-event region.</p>
+<p>. . .</p>
+</section>
+<section id="laplace-approximation" class="level3">
+<h3 class="anchored" data-anchor-id="laplace-approximation">Laplace Approximation</h3>
+<p>Use a Gaussian approximation centered at the mode of the target distribution.</p>
+<p>. . .</p>
+</section>
+<section id="adaptive-importance-sampling" class="level3">
+<h3 class="anchored" data-anchor-id="adaptive-importance-sampling">Adaptive Importance Sampling</h3>
+<p>Iteratively refine the importance distribution based on pilot runs.</p>
+<p>. . .</p>
+</section>
+<section id="mixture-and-defensive-proposals" class="level3">
+<h3 class="anchored" data-anchor-id="mixture-and-defensive-proposals">Mixture and Defensive Proposals</h3>
+<p>Combine components to capture multiple modes. A defensive component covers the support and controls the tails of the weighted contributions.</p>
+</section>
+</section>
+<section id="a-rare-event-no-hits" class="level2">
+<h2 class="anchored" data-anchor-id="a-rare-event-no-hits">A Rare Event: No Hits</h2>
+<p>For <span class="math inline">\(Z \sim \mathcal{N}(0,1)\)</span>, estimate <span class="math display">\[
+  p = P(Z &gt; 4) \approx 3.17 \times 10^{-5}.
+\]</span></p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>n_rare <span class="ot">&lt;-</span> <span class="dv">10000</span></span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>rare_hits <span class="ot">&lt;-</span> <span class="fu">rnorm</span>(n_rare) <span class="sc">&gt;</span> <span class="dv">4</span></span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a><span class="fu">mean</span>(rare_hits)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] 0</code></pre>
+</div>
+</div>
+<p>. . .</p>
+<p>This is typical: with <span class="math inline">\(N = 10{,}000\)</span>, <span class="math display">\[
+  P(\text{no exceedances}) = (1 - p)^N \approx 0.729.
+\]</span></p>
+<p>The empirical standard error is also zero. We have missed the event, not established that its probability is zero.</p>
+</section>
+<section id="a-rare-event-exponential-tilting" class="level2">
+<h2 class="anchored" data-anchor-id="a-rare-event-exponential-tilting">A Rare Event: Exponential Tilting</h2>
+<p>For the standard normal density <span class="math inline">\(f = \phi\)</span>, an shifts the mean: <span class="math display">\[
+  g_\theta(x) = e^{\theta x-\theta^2 / 2} f(x) = \phi(x - \theta).
+\]</span></p>
+<p>Choose <span class="math inline">\(\theta = 4\)</span>: <span class="math inline">\(X_i \sim \mathcal{N}(4,1)\)</span> and <span class="math inline">\(w^*(x) = f(x) / g_4(x) = e^{8-4x}\)</span>.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="lecture6_files/figure-html/rare-event-proposal-1.png" class="img-fluid figure-img" width="480"></p>
+<figcaption>Target and proposal densities for the rare-event example.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p>. . .</p>
+<p><span class="math display">\[
+  \hat{p}_{\mathrm{IS}}
+  = \frac{1}{N} \sum_{i=1}^N \mathbf{1}\{X_i &gt; 4\}\,e^{8-4X_i}.
+\]</span></p>
+</section>
+<section id="a-rare-event-repeated-runs" class="level2">
+<h2 class="anchored" data-anchor-id="a-rare-event-repeated-runs">A Rare Event: Repeated Runs</h2>
+<p>500 independent runs per method, with <span class="math inline">\(N = 10{,}000\)</span> draws per run.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="lecture6_files/figure-html/rare-event-comparison-1.png" class="img-fluid figure-img" width="499"></p>
+<figcaption>Estimates of the rare-event probability <span class="math inline">\(p\)</span> from 500 independent runs of ordinary Monte Carlo and importance sampling.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p>The dashed line is the truth. MC returned zero in 73.2% of runs.</p>
+<p>IS had about 91 times smaller empirical standard deviation at the same sample size.</p>
+</section>
+<section id="laplace-approximation-1" class="level2">
+<h2 class="anchored" data-anchor-id="laplace-approximation-1">Laplace Approximation</h2>
+<section id="basic-idea-1" class="level3">
+<h3 class="anchored" data-anchor-id="basic-idea-1">Basic Idea</h3>
+<p>Take a Gaussian approximation of the target density at its mode <span class="math inline">\(x^*\)</span> as the importance distribution.</p>
+<p>. . .</p>
+</section>
+<section id="motivation" class="level3">
+<h3 class="anchored" data-anchor-id="motivation">Motivation</h3>
+<p>The connection comes from the second-order Taylor expansion of <span class="math inline">\(\log f(x)\)</span> at an interior mode <span class="math inline">\(x^*\)</span>, <span class="math display">\[
+  \log f(x) \approx \log f(x^*) - \frac{1}{2}(x - x^*)^T \Lambda (x - x^*)
+\]</span> where <span class="math inline">\(\Lambda\)</span> is the Hessian of <span class="math inline">\(-\log f(x)\)</span> at <span class="math inline">\(x^*\)</span>, assumed positive definite.</p>
+<p>Exponentiating both sides gives: <span class="math display">\[
+  f(x)
+  \approx f(x^*) \exp\left( -\frac{1}{2}(x - x^*)^T \Lambda (x - x^*) \right)
+\]</span></p>
+</section>
+</section>
+<section id="laplace-approximation-2" class="level2">
+<h2 class="anchored" data-anchor-id="laplace-approximation-2">Laplace Approximation</h2>
+<section id="steps" class="level3">
+<h3 class="anchored" data-anchor-id="steps">Steps</h3>
+<ol type="1">
+<li>Find the mode <span class="math inline">\(x^* = \mathop{\mathrm{\arg\,\max}}_x f(x)\)</span>.</li>
+<li>Compute the Hessian <span class="math inline">\(\Lambda\)</span> of <span class="math inline">\(-\log f(x)\)</span> at <span class="math inline">\(x^*\)</span>.</li>
+<li>If <span class="math inline">\(\Lambda\)</span> is positive definite, use <span class="math inline">\(\mathcal{N}(x^*, \Lambda^{-1})\)</span> as the importance distribution.</li>
+</ol>
+<p>. . .</p>
+</section>
+<section id="when-to-use" class="level3">
+<h3 class="anchored" data-anchor-id="when-to-use">When to Use</h3>
+<p>Useful for smooth targets with an approximately Gaussian shape near the mode. Check the tails before using it for importance sampling.</p>
+</section>
+</section>
+<section id="example-gamma-distribution-1" class="level2">
+<h2 class="anchored" data-anchor-id="example-gamma-distribution-1">Example: Gamma Distribution</h2>
+<div class="columns">
+<div class="column" style="width:47%;">
+<p>The density of the <span class="math inline">\(\mathrm{Gamma}(3,1)\)</span> distribution is <span class="math display">\[
+  f(x) = \frac{1}{2} x^2 e^{-x}, \quad x &gt; 0.
+\]</span></p>
+<p>. . .</p>
+<p>The mode is at <span class="math inline">\(x^* = 2\)</span> and the Hessian of <span class="math inline">\(-\log f(x)\)</span> at <span class="math inline">\(x^*\)</span> is <span class="math display">\[
+  \Lambda = \frac{\alpha - 1}{(x^*)^2} = \frac 1 2.
+\]</span></p>
+<p>So the Laplace approximation is <span class="math inline">\(\mathcal{N}(2, 2)\)</span>, with standard deviation <span class="math inline">\(\sqrt{2}\)</span>.</p>
+</div><div class="column" style="width:47%;">
+<div class="cell">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="lecture6_files/figure-html/laplace-approx-plot-1.png" class="img-fluid figure-img" width="672"></p>
+<figcaption>Target (solid black) and Laplace approximation (dashed blue) densities for a Gamma(3,1) distribution.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section id="adaptive-importance-sampling-1" class="level2">
+<h2 class="anchored" data-anchor-id="adaptive-importance-sampling-1">Adaptive Importance Sampling</h2>
+<p>Adaptive importance sampling iteratively refines the importance distribution based on the samples obtained.</p>
+<p>. . .</p>
+<section id="basic-idea-2" class="level3">
+<h3 class="anchored" data-anchor-id="basic-idea-2">Basic Idea</h3>
+<p>Start with an initial importance distribution and refine it based on samples and weights.</p>
+<p>. . .</p>
+</section>
+<section id="steps-1" class="level3">
+<h3 class="anchored" data-anchor-id="steps-1">Steps</h3>
+<ol type="1">
+<li>Choose an initial importance distribution <span class="math inline">\(g_0(x)\)</span> and set <span class="math inline">\(n = 0\)</span>.</li>
+<li>Draw samples from the current proposal <span class="math inline">\(g_n\)</span> and compute weights.</li>
+<li>Fit <span class="math inline">\(g_{n+1}\)</span> using the weighted samples, then increment <span class="math inline">\(n\)</span>. </li>
+<li>Repeat steps 2-3 until the proposal stabilizes.</li>
+</ol>
+</section>
+</section>
+<section id="moment-matching-importance-sampling" class="level2">
+<h2 class="anchored" data-anchor-id="moment-matching-importance-sampling">Moment-Matching Importance Sampling</h2>
+<p>One simple adaptive strategy is to use moment-matching to update a Gaussian importance distribution.</p>
+<p>At iteration <span class="math inline">\(n\)</span>, draw samples <span class="math inline">\(x_1, \ldots, x_N \sim g_n(x)\)</span> and compute weights <span class="math display">\[
+  w_i^* = \frac{f(x_i)}{g_n(x_i)}.
+\]</span></p>
+<p>. . .</p>
+<p>Then update the importance distribution parameters as <span class="math display">\[
+\begin{aligned}
+  \mu_{n + 1}      &amp;= \frac{\sum_{i=1}^N w_i^* x_i}{\sum_{i=1}^N w_i^*},\\
+  \sigma^2_{n + 1} &amp;= \frac{\sum_{i=1}^N w_i^* (x_i - \mu_{n + 1})^2}{\sum_{i=1}^N w_i^*}.
+\end{aligned}
+\]</span></p>
+</section>
+<section id="section-6" class="level2">
+<h2 class="anchored" data-anchor-id="section-6"></h2>
+<div class="cell">
+
+</div>
+</section>
+<section id="defensive-importance-sampling" class="level2">
+<h2 class="anchored" data-anchor-id="defensive-importance-sampling">Defensive Importance Sampling</h2>
+<p>Return to the <span class="math inline">\(\mathrm{Gamma}(3,1)\)</span> target and estimating <span class="math inline">\(\operatorname{E}_f[X] = 3\)</span>. The Laplace proposal <span class="math inline">\(g_L = \mathcal{N}(2,2)\)</span> has a right tail that is too light: ordinary IS has .</p>
+<p>Add a heavy-tailed component <span class="math inline">\(g_t\)</span>, the density of <span class="math inline">\(2 + \sqrt{2}T\)</span> with <span class="math inline">\(T \sim t_3\)</span>: <span class="math display">\[
+  g_{\mathrm{mix}}(x) = 0.9 g_L(x) + 0.1 g_t(x).
+\]</span></p>
+<p>. . .</p>
+<p>Since <span class="math inline">\(g_{\mathrm{mix}} \geq 0.1g_t\)</span>, the mixture inherits protection from the Student-<span class="math inline">\(t\)</span> tails. For this Gamma mean, it restores .</p>
+</section>
+<section id="section-7" class="level2">
+<h2 class="anchored" data-anchor-id="section-7"></h2>
+<div class="cell">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="lecture6_files/figure-html/gamma-defensive-fig-1.png" class="img-fluid figure-img" width="518"></p>
+<figcaption>Gamma(3,1) target and proposals (left); importance weights on a logarithmic scale (right).</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="exercise-von-mises-importance-sampling" class="level2">
+<h2 class="anchored" data-anchor-id="exercise-von-mises-importance-sampling">Exercise: Von Mises Importance Sampling</h2>
+<section id="step-1" class="level3">
+<h3 class="anchored" data-anchor-id="step-1">Step 1</h3>
+<p>Estimate the arithmetic mean of the von Mises distribution on <span class="math inline">\([-\pi,\pi]\)</span> with <span class="math inline">\(\mu = 0\)</span> and <span class="math inline">\(\kappa = 2\)</span>. Plot convergence toward <span class="math inline">\(\operatorname{E}X = 0\)</span>.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>dvmises <span class="ot">&lt;-</span> <span class="cf">function</span>(x, <span class="at">mu =</span> <span class="dv">0</span>, <span class="at">kappa =</span> <span class="dv">2</span>) {</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ifelse</span>(</span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>    <span class="fu">abs</span>(x) <span class="sc">&lt;=</span> pi,</span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>    <span class="fu">exp</span>(kappa <span class="sc">*</span> <span class="fu">cos</span>(x <span class="sc">-</span> mu)) <span class="sc">/</span> (<span class="dv">2</span> <span class="sc">*</span> pi <span class="sc">*</span> <span class="fu">besselI</span>(kappa, <span class="dv">0</span>)),</span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a>    <span class="dv">0</span></span>
+<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<p>. . .</p>
+</section>
+<section id="step-2" class="level3">
+<h3 class="anchored" data-anchor-id="step-2">Step 2</h3>
+<p>Compute the estimate of the mean and its standard error.</p>
+<p>. . .</p>
+</section>
+<section id="step-3" class="level3">
+<h3 class="anchored" data-anchor-id="step-3">Step 3</h3>
+<p>Compute the effective sample size and coefficient of variation of the importance weights. Experiment with different importance densities to see if you find a better one.</p>
+</section>
+</section>
+<section id="solution-step-1-estimate-the-mean" class="level2">
+<h2 class="anchored" data-anchor-id="solution-step-1-estimate-the-mean">Solution: Step 1 — Estimate the Mean</h2>
+<p>The density is symmetric about zero, so <span class="math inline">\(x f(x)\)</span> is odd and <span class="math inline">\(\operatorname{E}X = \int_{-\pi}^{\pi} x f(x)\,\mathrm{d}x = 0\)</span>. Use the proposal <span class="math inline">\(g = \mathcal{N}(0,(\pi/2)^2)\)</span> and ordinary IS: <span class="math display">\[
+  \hat\mu_n = \frac{1}{n}\sum_{i=1}^n X_i w_i^*,
+  \qquad w_i^* = \frac{f(X_i)}{g(X_i)}.
+\]</span> The target density is normalized, so there is no need to divide by the sum of weights. Draws outside <span class="math inline">\([-\pi,\pi]\)</span> receive zero weight and remain in the sample of size <span class="math inline">\(n\)</span>.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb19"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">2026</span>)</span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>vm_N <span class="ot">&lt;-</span> <span class="dv">10000</span></span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>vm_x <span class="ot">&lt;-</span> <span class="fu">rnorm</span>(vm_N, <span class="at">sd =</span> pi <span class="sc">/</span> <span class="dv">2</span>)</span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a>vm_weights <span class="ot">&lt;-</span> <span class="fu">dvmises</span>(vm_x) <span class="sc">/</span> <span class="fu">dnorm</span>(vm_x, <span class="at">sd =</span> pi <span class="sc">/</span> <span class="dv">2</span>)</span>
+<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a>vm_values <span class="ot">&lt;-</span> vm_x <span class="sc">*</span> vm_weights</span>
+<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a>vm_running_mean <span class="ot">&lt;-</span> <span class="fu">cumsum</span>(vm_values) <span class="sc">/</span> <span class="fu">seq_len</span>(vm_N)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</section>
+<section id="solution-step-1-convergence" class="level2">
+<h2 class="anchored" data-anchor-id="solution-step-1-convergence">Solution: Step 1 — Convergence</h2>
+<div class="cell">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="lecture6_files/figure-html/vmises-convergence-1.png" class="img-fluid figure-img" width="480"></p>
+<figcaption>Running ordinary IS estimate of the von Mises arithmetic mean.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p>The running estimate approaches zero by the law of large numbers; its path need not be monotone.</p>
+</section>
+<section id="solution-step-2-standard-error" class="level2">
+<h2 class="anchored" data-anchor-id="solution-step-2-standard-error">Solution: Step 2 — Standard Error</h2>
+<p>Set <span class="math inline">\(Y_i = X_i w_i^*\)</span>. The estimate is the sample mean of the <span class="math inline">\(Y_i\)</span>, so <span class="math display">\[
+  \widehat{\mathrm{se}}(\hat\mu_N)
+  = \frac{s_Y}{\sqrt{N}},
+  \qquad
+  s_Y^2 = \frac{1}{N-1}\sum_{i=1}^N(Y_i-\hat\mu_N)^2.
+\]</span> Use the standard deviation of the weighted contributions, not the sampled <span class="math inline">\(X_i\)</span> or the weights alone.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb20"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>vm_estimate <span class="ot">&lt;-</span> <span class="fu">mean</span>(vm_values)</span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>vm_se <span class="ot">&lt;-</span> <span class="fu">sd</span>(vm_values) <span class="sc">/</span> <span class="fu">sqrt</span>(vm_N)</span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a><span class="fu">c</span>(</span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">estimate =</span> vm_estimate,</span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">standard_error =</span> vm_se,</span>
+<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">lower_95 =</span> vm_estimate <span class="sc">-</span> <span class="fl">1.96</span> <span class="sc">*</span> vm_se,</span>
+<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">upper_95 =</span> vm_estimate <span class="sc">+</span> <span class="fl">1.96</span> <span class="sc">*</span> vm_se</span>
+<span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>      estimate standard_error       lower_95       upper_95 
+     -0.005544       0.007253      -0.019759       0.008672 </code></pre>
+</div>
+</div>
+</section>
+<section id="solution-step-3-weight-diagnostics" class="level2">
+<h2 class="anchored" data-anchor-id="solution-step-3-weight-diagnostics">Solution: Step 3 — Weight Diagnostics</h2>
+<p>Using unnormalized weights, calculate <span class="math display">\[
+  \mathrm{ESS} = \frac{(\sum_i w_i^*)^2}{\sum_i (w_i^*)^2},
+  \qquad
+  \mathrm{CV} = \frac{\sqrt{N^{-1}\sum_i(w_i^*-\bar w^*)^2}}{\bar w^*}.
+\]</span> The CV uses divisor <span class="math inline">\(N\)</span>, as in the lecture; R’s <code>sd()</code> uses <span class="math inline">\(N-1\)</span>.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb22"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>vm_diagnostics <span class="ot">&lt;-</span> <span class="cf">function</span>(x, weights) {</span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>  n <span class="ot">&lt;-</span> <span class="fu">length</span>(x)</span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">data.frame</span>(</span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">estimate =</span> <span class="fu">mean</span>(x <span class="sc">*</span> weights),</span>
+<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">SE =</span> <span class="fu">sd</span>(x <span class="sc">*</span> weights) <span class="sc">/</span> <span class="fu">sqrt</span>(n),</span>
+<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">ESS =</span> <span class="fu">sum</span>(weights)<span class="sc">^</span><span class="dv">2</span> <span class="sc">/</span> <span class="fu">sum</span>(weights<span class="sc">^</span><span class="dv">2</span>),</span>
+<span id="cb22-7"><a href="#cb22-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">CV =</span> <span class="fu">sqrt</span>(<span class="fu">mean</span>((weights <span class="sc">-</span> <span class="fu">mean</span>(weights))<span class="sc">^</span><span class="dv">2</span>)) <span class="sc">/</span> <span class="fu">mean</span>(weights)</span>
+<span id="cb22-8"><a href="#cb22-8" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb22-9"><a href="#cb22-9" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb22-10"><a href="#cb22-10" aria-hidden="true" tabindex="-1"></a>vm_baseline <span class="ot">&lt;-</span> <span class="fu">vm_diagnostics</span>(vm_x, vm_weights)</span>
+<span id="cb22-11"><a href="#cb22-11" aria-hidden="true" tabindex="-1"></a>vm_baseline</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>   estimate       SE  ESS    CV
+1 -0.005544 0.007253 6876 0.674</code></pre>
+</div>
+</div>
+</section>
+<section id="solution-step-3-compare-proposals" class="level2">
+<h2 class="anchored" data-anchor-id="solution-step-3-compare-proposals">Solution: Step 3 — Compare Proposals</h2>
+<p>Try normal proposals with standard deviations <span class="math inline">\(1\)</span> and <span class="math inline">\(1.3\)</span>, which concentrate more draws near the target’s mode, and <span class="math inline">\(\mathrm{Uniform}(-\pi,\pi)\)</span>, which covers exactly its support. All four proposals are positive throughout the target’s support.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb24"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">2027</span>)</span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>vm_x_normal <span class="ot">&lt;-</span> <span class="fu">rnorm</span>(vm_N, <span class="at">sd =</span> <span class="dv">1</span>)</span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>vm_w_normal <span class="ot">&lt;-</span> <span class="fu">dvmises</span>(vm_x_normal) <span class="sc">/</span> <span class="fu">dnorm</span>(vm_x_normal)</span>
+<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>vm_x_uniform <span class="ot">&lt;-</span> <span class="fu">runif</span>(vm_N, <span class="sc">-</span>pi, pi)</span>
+<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a>vm_w_uniform <span class="ot">&lt;-</span> <span class="fu">dvmises</span>(vm_x_uniform) <span class="sc">/</span></span>
+<span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">dunif</span>(vm_x_uniform, <span class="sc">-</span>pi, pi)</span>
+<span id="cb24-7"><a href="#cb24-7" aria-hidden="true" tabindex="-1"></a>vm_x_middle <span class="ot">&lt;-</span> <span class="fu">rnorm</span>(vm_N, <span class="at">sd =</span> <span class="fl">1.3</span>)</span>
+<span id="cb24-8"><a href="#cb24-8" aria-hidden="true" tabindex="-1"></a>vm_w_middle <span class="ot">&lt;-</span> <span class="fu">dvmises</span>(vm_x_middle) <span class="sc">/</span> <span class="fu">dnorm</span>(vm_x_middle, <span class="at">sd =</span> <span class="fl">1.3</span>)</span>
+<span id="cb24-9"><a href="#cb24-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb24-10"><a href="#cb24-10" aria-hidden="true" tabindex="-1"></a>vm_comparison <span class="ot">&lt;-</span> <span class="fu">rbind</span>(</span>
+<span id="cb24-11"><a href="#cb24-11" aria-hidden="true" tabindex="-1"></a>  vm_baseline,</span>
+<span id="cb24-12"><a href="#cb24-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">vm_diagnostics</span>(vm_x_normal, vm_w_normal),</span>
+<span id="cb24-13"><a href="#cb24-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">vm_diagnostics</span>(vm_x_middle, vm_w_middle),</span>
+<span id="cb24-14"><a href="#cb24-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">vm_diagnostics</span>(vm_x_uniform, vm_w_uniform)</span>
+<span id="cb24-15"><a href="#cb24-15" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb24-16"><a href="#cb24-16" aria-hidden="true" tabindex="-1"></a>vm_comparison <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb24-17"><a href="#cb24-17" aria-hidden="true" tabindex="-1"></a>  <span class="at">proposal =</span> <span class="fu">c</span>(</span>
+<span id="cb24-18"><a href="#cb24-18" aria-hidden="true" tabindex="-1"></a>    <span class="st">"Normal, sd = pi/2"</span>, <span class="st">"Normal, sd = 1"</span>,</span>
+<span id="cb24-19"><a href="#cb24-19" aria-hidden="true" tabindex="-1"></a>    <span class="st">"Normal, sd = 1.3"</span>, <span class="st">"Uniform(-pi, pi)"</span></span>
+<span id="cb24-20"><a href="#cb24-20" aria-hidden="true" tabindex="-1"></a>  ),</span>
+<span id="cb24-21"><a href="#cb24-21" aria-hidden="true" tabindex="-1"></a>  vm_comparison</span>
+<span id="cb24-22"><a href="#cb24-22" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb24-23"><a href="#cb24-23" aria-hidden="true" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(vm_comparison, <span class="at">digits =</span> <span class="fu">c</span>(<span class="dv">0</span>, <span class="dv">5</span>, <span class="dv">5</span>, <span class="dv">0</span>, <span class="dv">3</span>), <span class="at">row.names =</span> <span class="cn">FALSE</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<thead>
+<tr class="header">
+<th style="text-align: left;">proposal</th>
+<th style="text-align: right;">estimate</th>
+<th style="text-align: right;">SE</th>
+<th style="text-align: right;">ESS</th>
+<th style="text-align: right;">CV</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Normal, sd = pi/2</td>
+<td style="text-align: right;">-0.00554</td>
+<td style="text-align: right;">0.00725</td>
+<td style="text-align: right;">6876</td>
+<td style="text-align: right;">0.674</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Normal, sd = 1</td>
+<td style="text-align: right;">-0.00261</td>
+<td style="text-align: right;">0.00856</td>
+<td style="text-align: right;">9372</td>
+<td style="text-align: right;">0.259</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Normal, sd = 1.3</td>
+<td style="text-align: right;">-0.00101</td>
+<td style="text-align: right;">0.00720</td>
+<td style="text-align: right;">7972</td>
+<td style="text-align: right;">0.504</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Uniform(-pi, pi)</td>
+<td style="text-align: right;">0.00950</td>
+<td style="text-align: right;">0.00802</td>
+<td style="text-align: right;">4582</td>
+<td style="text-align: right;">1.087</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+<section id="solution-step-3-interpretation" class="level2">
+<h2 class="anchored" data-anchor-id="solution-step-3-interpretation">Solution: Step 3 — Interpretation</h2>
+<p>At the same sample size, the smallest estimated standard error in this run is obtained with <strong>Normal, sd = 1.3</strong>. Compare standard errors to judge precision for this particular mean; proximity of one estimate to zero can be luck.</p>
+<p>Higher ESS and lower CV indicate more even weights, but do not necessarily give a smaller standard error: that also depends on the integrand <span class="math inline">\(h(x)=x\)</span>. For ordinary IS the ideal proposal is proportional to <span class="math inline">\(|x|f(x)\)</span>, rather than just <span class="math inline">\(f(x)\)</span>. Thus concentrating too tightly around zero can miss useful tail contributions. These diagnostics are empirical, so repeat the comparison with other seeds or larger samples before drawing strong conclusions.</p>
+</section>
+<section id="summary" class="level2">
+<h2 class="anchored" data-anchor-id="summary">Summary</h2>
+<section id="monte-carlo-methods-2" class="level3">
+<h3 class="anchored" data-anchor-id="monte-carlo-methods-2">Monte Carlo Methods</h3>
+<p>Estimate integrals and means using random sampling when analytic solutions are not possible.</p>
+<p>. . .</p>
+</section>
+<section id="importance-sampling-2" class="level3">
+<h3 class="anchored" data-anchor-id="importance-sampling-2">Importance Sampling</h3>
+<p>Focus samples where they matter most, but choose your proposal carefully to avoid large or variable weights.</p>
+<p>. . .</p>
+</section>
+<section id="diagnostics" class="level3">
+<h3 class="anchored" data-anchor-id="diagnostics">Diagnostics</h3>
+<p>Examine weights, weighted integrand values, and ESS to detect instability. These checks cannot guarantee accuracy or reveal every missed region.</p>
+<p>. . .</p>
+</section>
+<section id="picking-importance-distributions" class="level3">
+<h3 class="anchored" data-anchor-id="picking-importance-distributions">Picking Importance Distributions</h3>
+<p>It’s hard! But use adaptive and defensive methods to help fix poor coverage and improve robustness.</p>
+</section>
+</section>
+<section id="next-time" class="level2">
+<h2 class="anchored" data-anchor-id="next-time">Next Time</h2>
+<section id="optimization" class="level3">
+<h3 class="anchored" data-anchor-id="optimization">Optimization</h3>
+<p>We introduce optimization methods for minimizing and maximizing functions.</p>
+<p>We’ll focus on <strong>convex optimization</strong>, a special class of optimization problems that are easier to solve and have nice properties.</p>
+</section>
+</section>
+<section id="appendix" class="level1">
+<h1>Appendix</h1>
+<section id="variance-for-is-with-normalized-weights-1" class="level2">
+<h2 class="anchored" data-anchor-id="variance-for-is-with-normalized-weights-1">Variance for IS with Normalized Weights</h2>
+<p>Computing the variance of IS with normalized weights is more complicated because the estimator is a .</p>
+<p>Write <span class="math inline">\(c = \operatorname{E}_g[w^*(X)]\)</span>. If both <span class="math inline">\(h(X)w^*(X)\)</span> and <span class="math inline">\(w^*(X)\)</span> have finite variances, the multivariate CLT gives <span class="math display">\[
+  \frac{1}{N} \sum_{i=1}^N \begin{bmatrix} h(X_i) w^*(X_i) \\ w^*(X_i) \end{bmatrix}
+  \overset{\mathrm{approx}}{\sim}
+  \mathcal{N}\left(
+    c \begin{bmatrix} \mu \\ 1\end{bmatrix},
+    \frac{1}{N} \begin{bmatrix} \sigma^{2}_{\mathrm{IS}} &amp; \gamma \\ \gamma &amp; \sigma^2_{w^*} \end{bmatrix}
+  \right),
+\]</span> where <span class="math display">\[
+\begin{aligned}
+  \sigma^2_{\mathrm{IS}} &amp; = \V \big(h(X_1) w^*(X_1)\big) \\
+  \gamma &amp; = \mathop{\mathrm{Cov}}(h(X_1) w^*(X_1), w^*(X_1)) \\
+  \sigma^2_{w^*} &amp; = \V (w^*(X_1))
+\end{aligned}
+\]</span></p>
+</section>
+<section id="importance-sampling-variance-2" class="level2">
+<h2 class="anchored" data-anchor-id="importance-sampling-variance-2">Importance Sampling Variance</h2>
+<p>We can then apply the <span class="math inline">\(\Delta\)</span>-method with <span class="math inline">\(t(x, y) = x / y\)</span>.</p>
+<p>Observe that <span class="math inline">\(\nabla t(x, y) = \begin{bmatrix} 1 / y \\ -x / y^2 \end{bmatrix}\)</span> , whence</p>
+<p><span class="math display">\[
+  \nabla t(c\mu, c)^T \left(\begin{array}{cc} \sigma^{2}_{\mathrm{IS}} &amp; \gamma \\ \gamma &amp; \sigma^2_{w^*}
+  \end{array} \right) \nabla t(c\mu, c) = \frac{\sigma^{2}_{\mathrm{IS}} + \mu^2 \sigma_{w^*}^2 - 2 \mu \gamma}{c^{2}}.
+\]</span></p>
+<p>. . .</p>
+<p>By the <span class="math inline">\(\Delta\)</span>-method, <span class="math display">\[
+  \hat{\mu}_{\mathrm{IS}} \overset{\mathrm{approx}}{\sim} \mathcal{N}\left( \mu, \frac{\sigma^{2}_{\mathrm{IS}} + \mu^2 \sigma_{w^*}^2 - 2 \mu \gamma}{c^2 N} \right).
+\]</span></p>
+<p>. . .</p>
+<p>Plug in empirical estimates, estimating <span class="math inline">\(c\)</span> when it is unknown by <span class="math display">\[
+  \hat{c} = \frac{1}{N} \sum_{i=1}^N w^*(X_i).
+\]</span></p>
+<p>If both densities in the weights are unnormalized, <span class="math inline">\(c\)</span> is the ratio of their normalizing constants.</p>
+</section>
+<section id="section-8" class="level2">
+<h2 class="anchored" data-anchor-id="section-8"></h2>
+<div class="cell">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="lecture6_files/figure-html/delta-method-plot3D-1.png" class="img-fluid figure-img" width="480"></p>
+<figcaption>Tangent plane approximation of the function <span class="math inline">\(t(x,y) = x/y\)</span> at the point <span class="math inline">\((2,3)\)</span>.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+</section>
+
+
+<div id="quarto-appendix" class="default"><section id="footnotes" class="footnotes footnotes-end-of-document" role="doc-endnotes"><h2 class="anchored quarto-appendix-heading">Footnotes</h2>
+
+<ol>
+<li id="fn1"><p>For instance common in Bayesian statistics.<a href="#fnref1" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+</ol>
+</section></div></main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

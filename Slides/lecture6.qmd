@@ -1,0 +1,2106 @@
+---
+title: "Monte Carlo Integration and Importance Sampling"
+---
+
+{{< include _common.qmd >}}
+
+```{r}
+#| label: setup-common2
+#| echo: false
+#| message: false
+#| warning: false
+
+library(tidyverse)
+library(patchwork)
+theme_set(theme_minimal(base_size = 10))
+options(width = 60)
+```
+
+```{r}
+#| label: setup
+#| include: false
+
+old_options <- options(digits = 4)
+```
+
+## Today
+
+### Monte Carlo Methods
+
+General class of methods for estimating integrals and means.
+
+\medskip\pause
+
+Rejection sampling is a type of Monte Carlo method.
+
+. . .
+
+### Importance Sampling
+
+Focus on integrating functions and estimating means.
+
+\medskip\pause
+
+Useful when we cannot analytically compute the integral.
+
+\medskip\pause
+
+It is also a variance reduction technique.
+
+## Monte Carlo Methods
+
+### Basic, Simple Idea
+
+Use random sampling to obtain numerical results.
+
+\medskip\pause
+
+Useful when analytical solutions are infeasible.
+
+. . .
+
+### Monte Carlo Integration
+
+With $X_1, \ldots, X_N$ i.i.d. with density $f$ and $\E|h(X_1)| < \infty$,
+$$
+  \hat{\mu}_{\mathrm{MC}} = \frac{1}{N} \sum_{i=1}^N h(X_i) \rightarrow \mu
+                          = \E h(X_1) = \int h(x) f(x) \ \mathrm{d}x
+$$
+for $N \to \infty$ by the law of large numbers (LLN).
+
+## Monte Carlo Integration
+
+If $\sigma^2_{\mathrm{MC}} < \infty$, the central limit theorem (CLT) gives
+$$
+  \frac{1}{N} \sum_{i=1}^N h(X_i) \overset{\mathrm{approx}}
+  \sim \mathcal{N}(\mu, \sigma^2_{\mathrm{MC}} / N)
+$$
+where
+$$
+  \sigma^2_{\mathrm{MC}} = \V h(X_1) = \int (h(x) - \mu)^2 f(x) \ \mathrm{d}x.
+$$
+
+. . .
+
+We can estimate $\sigma^2_{\mathrm{MC}}$ using the empirical variance
+$$
+  \hat{\sigma}^2_{\mathrm{MC}}
+  = \frac{1}{N - 1} \sum_{i=1}^N (h(X_i) - \hat{\mu}_{\mathrm{MC}})^2,
+$$
+then the variance of $\hat{\mu}_{\mathrm{MC}}$ is estimated as
+$\hat{\sigma}^2_{\mathrm{MC}} / N$ and an approximate 95% confidence interval
+for $\mu$ is
+$$
+  \hat{\mu}_{\mathrm{MC}} \pm 1.96 \frac{\hat{\sigma}_{\mathrm{MC}}}{\sqrt{N}}.
+$$
+
+## Example: Gamma Distribution
+
+::: {.columns}
+::::: {.column width="47%"}
+We want to estimate the mean of a $\mathrm{Gamma}(8,1)$ distribution.
+
+. . .
+
+```{r, echo=-1}
+#| label: gamma-sim
+
+set.seed(1234)
+B <- 1000
+x <- rgamma(B, 8)
+
+mu_hat <- cumsum(x) / 1:B
+sigma_hat <- sd(x)
+mu_hat[B] # Theoretical: 8
+sigma_hat # Theoretical: sqrt(8)
+```
+:::::
+
+::::: {.column width="47%"}
+```{r}
+#| label: gamma-fig
+#| echo: false
+#| fig-cap: "Density of a Gamma(8,1) distribution with mean indicated."
+
+x <- seq(0, 20, length.out = 100)
+y <- dgamma(x, 8)
+
+tibble(x, y) |>
+  ggplot(aes(x, y)) +
+  geom_line() +
+  geom_vline(
+    xintercept = 8,
+    linetype = "dashed",
+    color = "steelblue"
+  ) +
+  annotate("text", x = 7, y = 0.02, label = "E(X)", hjust = -0.5)
+```
+:::::
+:::
+
+##
+
+```{r}
+#| label: gamma-fig1
+#| fig-height: 2.8
+#| fig-width: 5
+#| echo: false
+#| fig-cap: >-
+#|   Convergence of the Monte Carlo estimate of the mean of a Gamma(8,1)
+#|   distribution.
+
+p <- ggplot(tibble(x = 1:B, y = mu_hat), aes(x, y)) +
+  geom_hline(
+    yintercept = 8,
+    linetype = "dashed",
+    col = "steelblue4"
+  ) +
+  geom_line() +
+  geom_point(size = 0.5) +
+  coord_cartesian(ylim = c(6, 10))
+
+p +
+  geom_ribbon(
+    aes(
+      ymin = mu_hat - 1.96 * sigma_hat / sqrt(1:B),
+      ymax = mu_hat + 1.96 * sigma_hat / sqrt(1:B)
+    ),
+    fill = "dark orange",
+    alpha = 0.4
+  ) +
+  geom_line() +
+  geom_point(size = 0.5) +
+  coord_cartesian(ylim = c(6, 10))
+```
+
+## Choosing the Sample Size
+
+Monte Carlo standard errors decrease as $1 / \sqrt{N}$: halving the error
+requires four times as many samples.
+
+\medskip\pause
+
+Use a pilot run to estimate the variance and plan a \alert{fresh run} with a
+fixed sample size:
+$$
+  N
+  \approx \left( \frac{1.96\,\hat{\sigma}_{\mathrm{pilot}}}{\varepsilon} \right)^2.
+$$
+
+. . .
+
+This targets a 95% confidence-interval half-width of $\varepsilon$.
+
+\pdfpcnote{
+Round the planned sample size up to an integer. Use independent samples for the
+fresh run, fixing its size before generating them. This is approximate
+planning: the pilot variance estimate and the normal approximation can be
+inaccurate, so the requested precision is not guaranteed. Repeatedly checking
+an ordinary confidence interval and stopping when it is narrow does not
+guarantee coverage at the resulting data-dependent stopping time.
+}
+
+## Importance Sampling
+
+When we are only interested in Monte Carlo integration, we do not need to sample
+from the target distribution.
+
+. . .
+
+### Basic Idea
+
+Some regions of the target distribution are often more important than others.
+
+\medskip\pause
+
+So let's \alert{oversample} these regions, but correct for this by
+\alert{weighting} the samples.
+
+\medskip\pause
+
+We want to find $\mu = \E h(X)$. Observe that
+$$
+  \mu = \int h(x) f(x) \ \mathrm{d}x
+      = \int h(x) \frac{f(x)}{g(x)} g(x) \ \mathrm{d}x
+      = \int h(x) w^*(x) g(x) \ \mathrm{d}x
+$$
+whenever $g$ is a density satisfying
+$$
+  g(x) = 0 \Rightarrow f(x) = 0.
+$$
+
+## Weights
+
+With $X_1, \ldots, X_N$ i.i.d. with density $g$, define the *weights*
+$$
+  w^*(X_i) = \frac{f(X_i)}{g(X_i)}.
+$$
+
+. . .
+
+$g$ is the *importance* density and $f/g$ is called the *likelihood ratio*.
+
+. . .
+
+### Estimator
+
+$$
+  \hat{\mu}_{\mathrm{IS}}^* := \frac{1}{N} \sum_{i=1}^N h(X_i)w^*(X_i).
+$$
+
+It has mean $\mu$.
+
+##
+
+```{r}
+#| label: importance-sampling-plot
+#| echo: false
+#| fig-cap: "Target and importance densities with corresponding importance weights."
+#| fig-width: 5
+#| fig-height: 3
+
+x <- seq(-5, 5, length.out = 200)
+target <- dnorm(x, mean = 0, sd = 1)
+importance <- dnorm(x, mean = 1, sd = 1)
+
+p1 <- tibble(x, target, importance) |>
+  pivot_longer(
+    cols = c(target, importance),
+    names_to = "Density",
+    values_to = "value"
+  ) |>
+  ggplot(aes(x, value, color = Density, linetype = Density)) +
+  geom_line() +
+  scale_color_manual(
+    values = c(target = "black", importance = "steelblue")
+  ) +
+  scale_linetype_manual(
+    values = c(target = "solid", importance = "dashed")
+  ) +
+  theme(legend.position.inside = c(0.87, 0.82)) +
+  guides(
+    color = guide_legend(position = "inside"),
+    linetype = guide_legend(position = "inside")
+  ) +
+  labs(
+    y = "Density",
+    x = "x",
+    color = "Distribution",
+    linetype = "Distribution"
+  )
+
+w <- target / importance
+
+p2 <- tibble(x, w) |>
+  ggplot(aes(x, w)) +
+  geom_line() +
+  labs(x = "x", y = "Weight")
+
+p1 / p2 + plot_layout(heights = c(2, 1), axes = "collect")
+```
+
+## Gamma Importance Sampling
+
+::: {.columns}
+::::: {.column width="47%"}
+Use $X = 10 + 3T$, where $T \sim t_3$. This proposal has heavier tails than the
+Gamma target.
+
+```{r, echo=-1}
+#| label: gamma-sim-IS
+
+set.seed(1234)
+B <- 1000
+t <- rt(B, df = 3)
+x <- 10 + 3 * t
+g_x <- dt(t, df = 3) / 3
+w_star <- dgamma(x, 8) / g_x
+cum_mean <- cumsum(x * w_star)
+mu_hat_IS <- cum_mean / (1:B)
+mu_hat_IS[B]
+```
+
+Close to the theoretical value (8).
+:::::
+
+. . .
+
+::::: {.column width="47%"}
+```{r}
+#| label: gammasim-fig
+#| echo: false
+#| fig-height: 3.2
+#| fig-width: 2.7
+
+z <- seq(-12, 12, length.out = 100) + 10
+f_x <- dgamma(z, 8)
+g_x <- dt((z - 10) / 3, df = 3) / 3
+w <- f_x / g_x
+
+p1 <- tibble(x = z, target = f_x, importance = g_x) |>
+  pivot_longer(c(target, importance)) |>
+  ggplot(aes(x, value, color = name, linetype = name)) +
+  geom_line() +
+  guides(color = guide_legend(position = "inside")) +
+  scale_color_manual(
+    values = c(target = "black", importance = "steelblue")
+  ) +
+  scale_linetype_manual(
+    values = c(target = "solid", importance = "dashed")
+  ) +
+  theme(legend.position.inside = c(0.8, 0.8)) +
+  labs(y = "Density", color = "Density", linetype = "Density")
+
+p2 <- tibble(x = z, w) |>
+  ggplot(aes(x, w)) +
+  geom_line()
+
+p1 / p2 + plot_layout(axes = "collect")
+```
+:::::
+:::
+
+##
+
+```{r}
+#| label: gamma-IS-fig1
+#| echo: false
+#| fig-cap: >-
+#|   Convergence of the importance sampling estimate of the mean of a Gamma(8,1)
+#|   distribution using a Student-t proposal with 3 degrees of freedom, location
+#|   10, and scale 3.
+#| fig-width: 5
+#| fig-height: 2.5
+
+mu_hat_IS <- cumsum(x * w_star) / (1:B)
+sigma_hat_IS <- sd(x * w_star)
+
+p <- ggplot(tibble(x = 1:B, y = mu_hat_IS), aes(x, y)) +
+  geom_line() +
+  geom_point(size = 0.5) +
+  coord_cartesian(ylim = c(6, 10)) +
+  geom_hline(
+    yintercept = 8,
+    linetype = "dashed",
+    col = "steelblue4"
+  )
+p
+```
+
+## Importance Sampling Variance
+
+Again by the LLN, assuming $\E_f|h(X)| < \infty$,
+$$
+  \hat{\mu}_{\mathrm{IS}}^* \rightarrow \E h(X_1) w^*(X_1)
+                            = \mu \quad \text{as } N \to \infty.\pause
+$$
+If $\sigma^{*2}_{\mathrm{IS}} < \infty$, the CLT gives
+$$
+  \hat{\mu}_{\mathrm{IS}}^* \overset{\mathrm{approx}}
+  \sim \mathcal{N}(\mu, \sigma^{*2}_{\mathrm{IS}} / N)
+$$
+where
+$$
+  \sigma^{*2}_{\mathrm{IS}} = \V \big( h(X_1)w^*(X_1)\big)
+                            = \int (h(x) w^*(x) - \mu)^2 g(x) \ \mathrm{d}x.
+$$
+
+## Importance Sampling Variance
+
+The IS variance can be estimated analogously to the MC variance,
+$$
+  \hat{\sigma}^{*2}_{\mathrm{IS}}
+  = \frac{1}{N - 1} \sum_{i=1}^N (h(X_i)w^*(X_i) - \hat{\mu}_{\mathrm{IS}}^*)^2.
+$$
+
+. . .
+
+An approximate 95% confidence interval is
+$$
+  \hat{\mu}^*_{\mathrm{IS}}
+  \pm 1.96 \frac{\hat{\sigma}^*_{\mathrm{IS}}}{\sqrt{N}}.
+$$
+
+\medskip\pause
+
+We may have $\sigma^{*2}_{\mathrm{IS}} > \sigma^2_{\mathrm{MC}}$ or
+$\sigma^{*2}_{\mathrm{IS}} < \sigma^2_{\mathrm{MC}}$ depending on $h$ and $g$.
+
+. . .
+
+### Goal
+
+Choose $g$ so that $|h(x)| w^*(x)$ becomes as constant as possible.
+
+## Gamma Importance Sampling
+
+```{r}
+#| label: gamma-IS-sd
+#| echo: true
+
+sigma_hat_IS <- sd(x * w_star)
+sigma_hat_IS
+```
+
+. . .
+
+```{r}
+#| label: gamma-IS-fig2
+#| echo: false
+#| fig-width: 4.5
+#| fig-height: 2
+#| fig-cap: "Gamma mean estimate with approximate pointwise 95% intervals."
+
+p +
+  geom_ribbon(
+    aes(
+      ymin = mu_hat_IS - 1.96 * sigma_hat_IS / sqrt(1:B),
+      ymax = mu_hat_IS + 1.96 * sigma_hat_IS / sqrt(1:B)
+    ),
+    fill = "darkorange",
+    alpha = 0.4
+  ) +
+  geom_line() +
+  geom_point(size = 0.5)
+```
+
+```{r}
+#| label: test
+#| echo: false
+#| eval: false
+
+mu_hat_IS <- replicate(10000, {
+  x <- 10 + 3 * rt(B, df = 3)
+  w_star <- dgamma(x, 8) / (dt((x - 10) / 3, df = 3) / 3)
+  mean(x * w_star)
+})
+sd(mu_hat_IS) * sqrt(B)
+```
+
+## Accounting for the Integrand
+
+Suppose we want to estimate
+$$
+  \E(X^4) = \int x^4 f(x) \ \mathrm{d}x = 3
+$$
+where $f(x)$ is the standard normal density.
+
+\medskip\pause
+
+Direct Monte Carlo samples from $f$, placing most draws near zero.
+
+\medskip\pause
+
+The \alert{integrand} $x^4f(x)$ peaks at $x = \pm2$ and decays to zero in the
+far tails. We want more draws around those peaks.
+
+\medskip\pause
+
+Try a wider Gaussian: $g = \mathcal{N}(0,4)$, with standard deviation $2$. This
+puts more mass near $\pm2$ and reduces the variance of $X^4f(X)/g(X)$.
+
+\pdfpcnote{
+The proposal should account for the shape of the integrand. Nonlinearity alone
+does not tell us which proposal to choose. Differentiating x^4 f(x) gives
+x^3 (4 - x^2) f(x), so the two maxima are at -2 and 2. The wider Gaussian is a
+simple approximation to this shape; it is not the optimal proposal. The next
+two slides illustrate the improvement and give the ideal density.
+}
+
+##
+
+::: {.columns}
+::::: {.column width="47%"}
+```{r}
+#| label: is-normal-plot
+#| echo: false
+#| fig-height: 2.65
+#| fig-cap: >-
+#|   Direct MC: $g = f = \mathcal{N}(0,1)$.
+
+set.seed(1)
+N <- 1000
+x_norm <- rnorm(N)
+target <- dnorm(x_norm, 0, 1)
+importance_norm <- dnorm(x_norm, 0, 1)
+weights_norm <- target / importance_norm
+w_h <- x_norm^4 * weights_norm
+
+x_grid <- seq(-6, 6, length.out = 200)
+dens_df <- tibble(
+  x = x_grid,
+  target = dnorm(x_grid, 0, 1),
+  integrand = x_grid^4 * dnorm(x_grid, 0, 1)
+) |>
+  pivot_longer(
+    cols = c(target, integrand),
+    names_to = "Type",
+    values_to = "value"
+  )
+
+p1 <- ggplot(
+  dens_df,
+  aes(x, value, color = Type, linetype = Type)
+) +
+  geom_line() +
+  annotate(
+    "point",
+    x = c(-2, 2),
+    y = 2^4 * dnorm(2),
+    color = "darkorange"
+  ) +
+  scale_x_continuous(breaks = c(-4, -2, 0, 2, 4)) +
+  labs(y = "Density / Integrand") +
+  scale_color_manual(
+    values = c(target = "black", integrand = "darkorange"),
+    labels = c(
+      target = expression(f(x) == g(x)),
+      integrand = expression(h(x) * f(x))
+    )
+  ) +
+  scale_linetype_manual(
+    values = c(target = "solid", integrand = "dashed"),
+    labels = c(
+      target = expression(f(x) == g(x)),
+      integrand = expression(h(x) * f(x))
+    )
+  ) +
+  guides(
+    color = guide_legend(position = "inside"),
+    linetype = guide_legend(position = "inside")
+  ) +
+  labs(color = NULL, linetype = NULL) +
+  theme(legend.position.inside = c(0.85, 0.85))
+
+p1b <- ggplot(tibble(x = w_h), aes(x)) +
+  geom_histogram(binwidth = 2, boundary = 0) +
+  labs(x = expression(h(x) * w^"*"))
+
+p1 / p1b + plot_layout(heights = c(2, 1))
+```
+:::::
+
+::::: {.column width="47%"}
+```{r}
+#| label: is-wide-normal-plot
+#| echo: false
+#| fig-height: 2.65
+#| fig-cap: >-
+#|   Importance sampling: $g = \mathcal{N}(0,4)$.
+
+set.seed(1)
+x_wide <- rnorm(N, sd = 2)
+target_wide <- dnorm(x_wide)
+importance_wide <- dnorm(x_wide, sd = 2)
+weights_wide <- target_wide / importance_wide
+w_h_wide <- x_wide^4 * weights_wide
+
+dens_df_wide <- tibble(
+  x = x_grid,
+  target = dnorm(x_grid, 0, 1),
+  importance = dnorm(x_grid, sd = 2),
+  integrand = x_grid^4 * dnorm(x_grid, 0, 1)
+) |>
+  pivot_longer(
+    cols = c(target, importance, integrand),
+    names_to = "Type",
+    values_to = "value"
+  )
+
+p2 <- ggplot(
+  dens_df_wide,
+  aes(x, value, color = Type, linetype = Type)
+) +
+  geom_line() +
+  annotate(
+    "point",
+    x = c(-2, 2),
+    y = 2^4 * dnorm(2),
+    color = "darkorange"
+  ) +
+  scale_x_continuous(breaks = c(-4, -2, 0, 2, 4)) +
+  labs(y = "Density / Integrand") +
+  scale_color_manual(
+    values = c(
+      target = "black",
+      importance = "royalblue",
+      integrand = "darkorange"
+    ),
+    labels = c(
+      target = expression(f(x)),
+      importance = expression(g(x)),
+      integrand = expression(h(x) * f(x))
+    )
+  ) +
+  guides(
+    color = guide_legend(position = "inside"),
+    linetype = guide_legend(position = "inside")
+  ) +
+  scale_linetype_manual(
+    values = c(
+      target = "solid",
+      importance = "dashed",
+      integrand = "dotdash"
+    ),
+    labels = c(
+      target = expression(f(x)),
+      importance = expression(g(x)),
+      integrand = expression(h(x) * f(x))
+    )
+  ) +
+  labs(color = NULL, linetype = NULL) +
+  theme(legend.position.inside = c(0.85, 0.85))
+
+p2b <- ggplot(tibble(x = w_h_wide), aes(x)) +
+  geom_histogram(binwidth = 2, boundary = 0) +
+  labs(x = expression(h(x) * w^"*"))
+
+p2 / p2b + plot_layout(heights = c(2, 1))
+```
+:::::
+:::
+
+. . .
+
+For the same $N$, the estimator variances are
+$$
+  \V(\hat\mu_{\mathrm{MC}}) = \frac{96}{N},
+  \qquad
+  \V(\hat\mu_{\mathrm{IS}}^*) \approx \frac{7.93}{N}.
+$$
+
+\pdfpcnote{
+Each histogram shows 1000 weighted contributions, with bin width 2. The
+horizontal scales differ. Direct MC contributions are X^4, while the wider
+Gaussian gives 2 X^4 exp(-3 X^2 / 8), which is bounded above by about 7.70.
+The variances shown are theoretical, not estimates from these histograms:
+Var under f of X^4 is E under f of X^8 minus 9 = 105 - 9 = 96.
+For g = N(0,4), the second moment is
+210 / (7/4)^{9/2}, giving variance approximately 7.925756.
+The wider Gaussian reduces variance by a factor of about 12.
+}
+
+## The Ideal Importance Density
+
+For $0 < \E_f|h(X)| < \infty$, the variance-minimizing density for ordinary IS
+is
+$$
+  g_{\mathrm{opt}}(x) = \frac{|h(x)|f(x)}{\int |h(u)|f(u)\,\mathrm{d}u}.
+$$
+
+. . .
+
+If $h \geq 0$, then $g_{\mathrm{opt}} = hf / \mu$. Every draw gives
+$$
+  \frac{h(X)f(X)}{g_{\mathrm{opt}}(X)} = \mu, \qquad X \sim g_{\mathrm{opt}},
+$$
+so the estimator has \alert{zero variance}.
+
+\medskip\pause
+
+But evaluating these weights requires the normalizing constant $\mu$, the
+integral we want. Use the shape of $|h|f$ to guide a practical proposal.
+
+\pdfpcnote{
+Ordinary IS only requires proposal support wherever the integrand is nonzero.
+For sign-changing h, the optimal proposal still minimizes variance, but the
+weighted contributions generally have different signs and the variance is not
+zero. This result is for ordinary IS, not self-normalized IS.
+}
+
+## Normalized Weights
+
+If $f = c^{-1} q$ with $c$ unknown^[For instance common in Bayesian statistics.]
+then
+$$
+  c = \int q(x) \ \mathrm{d}x = \int \frac{q(x)}{g(x)} g(x) \ \mathrm{d}x.
+$$
+
+. . .
+
+And
+$$
+  \mu
+  = \frac{\int h(x) w^*(x) g(x) \ \mathrm{d}x}{\int w^*(x) g(x) \ \mathrm{d}x},
+$$
+where
+$$
+  w^*(x) = \frac{q(x)}{g(x)}.
+$$
+
+\pdfpcnote{
+Note that g is still the normalized density.
+}
+
+## IS with Normalized Weights
+
+An importance sampling estimate of $\mu$ is thus
+$$
+  \hat{\mu}_{\mathrm{IS}}
+  = \frac{\sum_{i=1}^N h(X_i) w^*(X_i)}{\sum_{i=1}^N w^*(X_i)} \pause
+  = \sum_{i=1}^N h(X_i) w(X_i),
+$$
+where $w^*(X_i) = q(X_i) / g(X_i)$ and
+$$
+  w(X_i) = \frac{w^*(X_i)}{\sum_{i=1}^N w^*(X_i)}
+$$
+are the *normalized weights*.
+
+\medskip\pause
+
+This works regardless of the normalizing constant $c$, and also if an
+unnormalized proposal density is used in the weights.
+
+\medskip\pause
+
+The estimator is generally biased for finite $N$, but is consistent under the
+support and integrability assumptions.
+
+## Gamma Sampling with Normalized Weights
+
+Ignore the normalizing constants of the Gamma target and proposal $10 + 3T$,
+$T \sim t_3$. Set $w^*(x) = 0$ for $x \leq 0$, and otherwise use
+$$
+  w^*(x) = x^7 e^{-x} \left( 1 + \frac{(x - 10)^2}{27} \right)^2.
+$$
+
+. . .
+
+```{r, echo=-1}
+#| label: gamma-sim-ISw
+
+set.seed(1234)
+B <- 1000
+x <- 10 + 3 * rt(B, df = 3)
+w_star <- numeric(B)
+x_pos <- x[x > 0]
+w_star[x > 0] <- exp(
+  2 * log1p((x_pos - 10)^2 / 27) - x_pos + 7 * log(x_pos)
+)
+
+mu_hat_IS <- cumsum(x * w_star) / cumsum(w_star)
+mu_hat_IS[B] # Theoretical value 8
+```
+
+##
+
+```{r}
+#| label: gamma-ISw-fig1
+#| echo: false
+#| fig-width: 4.5
+#| fig-height: 3
+#| fig-cap: >-
+#|   Convergence of the importance sampling estimate of the mean of a Gamma(8,1)
+#|   distribution using normalized weights.
+
+p <- tibble(x = 1:B, y = mu_hat_IS) |>
+  ggplot(aes(x, y)) +
+  geom_line() +
+  geom_point(size = 0.5) +
+  coord_cartesian(ylim = c(6, 10)) +
+  labs(y = expression(hat(mu)[IS]), x = "Number of samples")
+p
+```
+
+## Variance for IS with Normalized Weights
+
+Let $w_i = w(X_i)$ be the normalized weights. If $w^*(X)$ and $h(X)w^*(X)$ have
+finite variances, the $\Delta$-method gives the standard error estimate
+$$
+  \widehat{\mathrm{se}}(\hat{\mu}_{\mathrm{IS}})
+  = \sqrt{\frac{N}{N - 1} \sum_{i=1}^N w_i^2 \big(h(X_i) - \hat{\mu}_{\mathrm{IS}}\big)^2}.
+$$
+
+This accounts for uncertainty in both the weighted sum and the sum of weights.
+
+\medskip\pause
+
+An approximate 95% confidence interval is
+$$
+  \hat{\mu}_{\mathrm{IS}}
+  \pm 1.96\,\widehat{\mathrm{se}}(\hat{\mu}_{\mathrm{IS}}).
+$$
+
+\medskip\pause
+
+Normalizing constants cancel.
+
+\pdfpcnote{
+The factor N/(N-1) matches the sample-variance convention used earlier.
+Equivalently, compute the sample standard deviation of
+w-star times (h minus mu-hat), divide by the mean unnormalized weight,
+and then divide by the square root of N.
+}
+
+## Gamma Normalized Weights: Standard Error
+
+```{r}
+#| label: sigma_hat_is_w
+
+w <- w_star / sum(w_star)
+weighted_residuals <- w * (x - mu_hat_IS[B])
+se_hat_IS <- sqrt(B / (B - 1) * sum(weighted_residuals^2))
+se_hat_IS
+```
+
+. . .
+
+```{r}
+#| label: gamma-ISw-fig2
+#| echo: false
+#| fig-width: 4.5
+#| fig-height: 1.75
+#| fig-cap: "Gamma mean estimate with approximate pointwise 95% intervals."
+
+sigma_hat_IS_w <- se_hat_IS * sqrt(B)
+
+p +
+  geom_ribbon(
+    aes(
+      ymin = mu_hat_IS - 1.96 * sigma_hat_IS_w / sqrt(1:B),
+      ymax = mu_hat_IS + 1.96 * sigma_hat_IS_w / sqrt(1:B)
+    ),
+    fill = "darkorange",
+    alpha = 0.4
+  ) +
+  geom_line() +
+  geom_point(size = 0.5)
+```
+
+## When to Use Importance Sampling?
+
+### Rare Events
+
+Estimating probabilities or expectations involving rare events.
+
+. . .
+
+### High-Variance Monte Carlo
+
+Importance sampling can reduce variance by focusing samples where the integrand
+is large.
+
+. . .
+
+### Difficult-to-Sample Targets
+
+When direct sampling from the target distribution is hard, but sampling from a
+related importance distribution is easy.
+
+## Poor Importance Distribution
+
+If the importance distribution assigns little mass to important regions,
+weighted contributions can be highly variable and estimates unreliable.
+
+\medskip\pause
+
+### Remedies
+
+More samples may help with poor overlap. They cannot repair missing support: if
+$g = 0$ where $hf \neq 0$, ordinary IS misses part of the integral.
+
+\medskip\pause
+
+Redesign the importance density to cover the required support and put more mass
+where the integrand is large. Self-normalized IS must cover the target support,
+including where $h = 0$.
+
+## Diagnostics for Importance Sampling
+
+### Weight Distribution
+
+Plot the weights and weighted integrand values to identify extreme
+contributions.
+
+. . .
+
+### Effective Sample Size (ESS)
+
+ESS summarizes weight concentration. A high ESS cannot rule out missed regions.
+
+. . .
+
+### Coefficient of Variation (CV)
+
+CV quantifies the relative variability of the weights.
+
+. . .
+
+### Comparison with Standard Monte Carlo
+
+Comparing with standard Monte Carlo shows whether importance sampling actually
+improves efficiency.
+
+## Weight Degeneracies
+
+::: {.columns}
+::::: {.column width="47%"}
+Suppose that
+$$
+  X \sim \mathcal{N}(0, I_{2})
+$$
+and that we want to estimate $\E(h(X))$ where $h(X)$ is large near the origin.
+
+\medskip\pause
+
+If we use an importance density $g(x)$ from
+$$
+  \mathcal{N}(\mu, I_{2})
+$$
+with large $\|\mu\|$, most samples are far from the origin, so $h(X)$ is nearly
+zero and weights are highly variable.
+:::::
+
+::::: {.column width="47%"}
+```{r}
+#| label: poor-importance-demo
+#| echo: false
+#| fig-height: 2.3
+#| fig-cap: >-
+#|   Target (blue) and importance (orange) densities with samples from the
+#|   importance distribution.
+
+library(mvtnorm)
+
+set.seed(1)
+d <- 2
+N <- 1000
+mu <- rep(2, d)
+x <- matrix(rnorm(N * d, mean = mu), ncol = d)
+
+colnames(x) <- c("x1", "x2")
+
+grid <- expand.grid(
+  x1 = seq(-5, 8, length.out = 100),
+  x2 = seq(-5, 8, length.out = 100)
+)
+grid_mat <- as.matrix(grid)
+
+grid$target <- dmvnorm(grid_mat, mean = rep(0, d))
+grid$importance <- dmvnorm(grid_mat, mean = mu)
+
+tibble(
+  x1 = grid$x1,
+  x2 = grid$x2,
+  target = grid$target,
+  importance = grid$importance
+) |>
+  ggplot(aes(x1, x2)) +
+  geom_contour(
+    aes(z = target),
+    color = "steelblue",
+    linetype = "dashed"
+  ) +
+  geom_contour(aes(z = importance), color = "darkorange") +
+  geom_point(
+    aes(x1, x2),
+    data = as_tibble(x),
+    alpha = 0.3,
+    size = 0.5
+  ) +
+  labs(x = expression(X[1]), y = expression(X[2])) +
+  coord_fixed()
+```
+:::::
+:::
+
+##
+
+```{r}
+#| label: weight-degeneracy-plot
+#| fig-width: 5.3
+#| fig-height: 3.2
+#| echo: false
+#| fig-cap: "Histogram and boxplot of importance weights, showing weight degeneracy."
+
+target_density <- function(x) dmvnorm(x, mean = rep(0, d))
+importance_density <- function(x) dmvnorm(x, mean = mu)
+h <- function(x) exp(-sum(x^2) / 2)
+
+w_star <- apply(
+  x,
+  1,
+  function(row) target_density(row) / importance_density(row)
+)
+values <- apply(x, 1, h)
+estimate <- sum(values * w_star) / sum(w_star)
+
+df <- tibble(weights = w_star)
+
+p1 <- ggplot(df, aes(weights)) +
+  geom_histogram() +
+  labs(x = "Importance Weights", y = "Frequency")
+
+p2 <- ggplot(df, aes(weights)) +
+  geom_boxplot(alpha = 0.5) +
+  scale_y_discrete() +
+  labs(x = "Importance Weights")
+
+p1 + p2 + plot_layout(heights = c(2, 1), axes = "collect")
+```
+
+\pdfpcnote{
+This indicates weight degeneracy and poor sampling efficiency.
+}
+
+## Effective Sample Size (ESS)
+
+The weight-based effective sample size (ESS) summarizes how evenly the total
+weight is distributed across samples:
+$$
+  \mathrm{ESS}
+  = \frac{1}{\sum_{i=1}^N w_i^2}
+  = \frac{\left( \sum_{i=1}^N w^*_i \right)^2}{\sum_{i=1}^N ({w^*_i})^2}
+$$
+where $w_i$ are the \alert{normalized} importance weights.
+
+\medskip\pause
+
+If all weights are equal, $\mathrm{ESS} = N$. If one weight dominates,
+$\mathrm{ESS} \approx 1$, which warns of possible instability.
+
+. . .
+
+### Bivariate Normal Example
+
+```{r}
+#| label: ess-demo
+#| include: false
+
+ess <- (sum(w_star))^2 / sum(w_star^2)
+```
+
+For the bivariate example, with get an ESS of about `r round(ess)` out of
+$N = 1000$ samples.
+
+## Coefficient of Variation (CV)
+
+The coefficient of variation (CV) of the weights measures their relative
+variability.
+
+\medskip\pause
+
+It is defined as
+$$
+  \mathrm{CV}
+  = \frac{\sqrt{\frac{1}{N} \sum_{i=1}^N (w_i - \bar{w})^2}}{\bar{w}}
+$$
+where $\bar{w} = \frac{1}{N} \sum_{i=1}^N w_i$ is the mean weight.
+
+. . .
+
+### Interpretation
+
+A high CV indicates uneven weights, which can make estimates unstable.
+
+\medskip\pause
+
+CV near 0 means nearly uniform weights. Even CV below 1 ($\mathrm{ESS} > N/2$)
+does not guarantee accuracy: the integrand matters, and samples can miss
+important regions.
+
+. . .
+
+### Connection to ESS
+
+There is a direct relationship between ESS and CV:
+$$
+  \mathrm{ESS} = \frac{N}{1 + \mathrm{CV}^2}.
+$$
+
+## Choosing the Importance Distribution
+
+We want low-variance estimates of
+$$
+  I = \int h(x) f(x) \ \mathrm{d}x
+$$
+
+. . .
+
+The importance distribution determines the weights
+$$
+  w^*(x) = \frac{f(x)}{g(x)}
+$$
+but ordinary IS variance depends on $h(X)w^*(X)$, not just the weights. For
+self-normalized IS, the asymptotic variance depends on $(h(X) - \mu)w^*(X)$.
+
+## Principles for Choosing the Importance Distribution
+
+### Cover the Support
+
+Require $g(x) > 0$ wherever $|h(x)|f(x) > 0$ for ordinary IS, and wherever
+$f(x) > 0$ for self-normalized IS, up to sets of measure zero.
+
+. . .
+
+### Match the Bulk
+
+For ordinary IS, put more mass where $|h(x)|f(x)$ is large. For self-normalized
+IS, the corresponding quantity is $|h(x) - \mu|f(x)$.
+
+. . .
+
+### Give it Heavy-Enough Tails
+
+Use tails heavy enough that the weighted contributions have finite variance.
+Heavier tails than the target are often a useful safeguard.
+
+## Common Strategies
+
+### Exponential Tilting
+
+Multiply the target density by an exponential factor to favor a rare-event
+region.
+
+. . .
+
+### Laplace Approximation
+
+Use a Gaussian approximation centered at the mode of the target distribution.
+
+. . .
+
+### Adaptive Importance Sampling
+
+Iteratively refine the importance distribution based on pilot runs.
+
+. . .
+
+### Mixture and Defensive Proposals
+
+Combine components to capture multiple modes. A defensive component covers the
+support and controls the tails of the weighted contributions.
+
+## A Rare Event: No Hits
+
+For $Z \sim \mathcal{N}(0,1)$, estimate
+$$
+  p = P(Z > 4) \approx 3.17 \times 10^{-5}.
+$$
+
+```{r, echo=-1}
+#| label: rare-event-mc
+
+set.seed(1)
+n_rare <- 10000
+rare_hits <- rnorm(n_rare) > 4
+mean(rare_hits)
+```
+
+. . .
+
+This is typical: with $N = 10{,}000$,
+$$
+  P(\text{no exceedances}) = (1 - p)^N \approx 0.729.
+$$
+
+The empirical standard error is also zero. We have missed the event, not
+established that its probability is zero.
+
+## A Rare Event: Exponential Tilting
+
+For the standard normal density $f = \phi$, an \alert{exponential tilt} shifts
+the mean:
+$$
+  g_\theta(x) = e^{\theta x-\theta^2 / 2} f(x) = \phi(x - \theta).
+$$
+
+Choose $\theta = 4$: $X_i \sim \mathcal{N}(4,1)$ and
+$w^*(x) = f(x) / g_4(x) = e^{8-4x}$.
+
+```{r}
+#| label: rare-event-proposal
+#| echo: false
+#| fig-width: 5
+#| fig-height: 1.6
+#| fig-cap: "Target and proposal densities for the rare-event example."
+
+rare_grid <- tibble(
+  x = seq(-4, 8, length.out = 601),
+  target = dnorm(x),
+  proposal = dnorm(x, mean = 4)
+)
+
+rare_grid |>
+  pivot_longer(c(target, proposal), names_to = "density") |>
+  ggplot(aes(x, value, color = density, linetype = density)) +
+  geom_area(
+    data = filter(rare_grid, x > 4),
+    aes(x = x, y = proposal),
+    inherit.aes = FALSE,
+    fill = "darkorange",
+    alpha = 0.2
+  ) +
+  geom_line() +
+  geom_vline(xintercept = 4, linetype = "dotted") +
+  scale_color_manual(
+    values = c(target = "royalblue", proposal = "darkorange")
+  ) +
+  scale_linetype_manual(
+    values = c(target = "solid", proposal = "dashed")
+  ) +
+  labs(
+    x = expression(x),
+    y = "Density",
+    color = NULL,
+    linetype = NULL
+  )
+```
+
+. . .
+
+$$
+  \hat{p}_{\mathrm{IS}}
+  = \frac{1}{N} \sum_{i=1}^N \mathbf{1}\{X_i > 4\}\,e^{8-4X_i}.
+$$
+
+\pdfpcnote{
+Exponential tilting multiplies the density by exp(theta times x) and divides
+by the moment-generating function. For a standard normal, this normalizing
+constant is exp(theta squared divided by 2). Completing the square gives a
+normal distribution with mean theta and variance 1. At theta = 4, half the
+proposal draws exceed 4. Shifting a general density need not be an exponential
+tilt.
+
+The ideal proposal is the standard normal conditional on exceeding 4. Its
+normalizing constant is p. The shifted normal is a simple approximation that
+makes exceedances common and has an evaluable, normalized density.
+}
+
+## A Rare Event: Repeated Runs
+
+```{r}
+#| label: rare-event-replicates
+#| include: false
+
+set.seed(2026)
+p_rare <- pnorm(4, lower.tail = FALSE)
+rare_estimates <- replicate(500, {
+  z <- rnorm(n_rare)
+  x <- rnorm(n_rare, mean = 4)
+  c(MC = mean(z > 4), IS = mean((x > 4) * exp(8 - 4 * x)))
+})
+
+rare_runs <- tibble(
+  run = seq_len(ncol(rare_estimates)),
+  MC = rare_estimates["MC", ],
+  IS = rare_estimates["IS", ]
+) |>
+  pivot_longer(
+    c(MC, IS),
+    names_to = "method",
+    values_to = "estimate"
+  ) |>
+  mutate(
+    method = factor(
+      method,
+      levels = c("MC", "IS"),
+      labels = c("Ordinary MC", "Importance sampling")
+    )
+  )
+
+rare_zero_percent <- 100 * mean(rare_estimates["MC", ] == 0)
+rare_sd_ratio <- sd(rare_estimates["MC", ]) /
+  sd(rare_estimates["IS", ])
+```
+
+500 independent runs per method, with $N = 10{,}000$ draws per run.
+
+```{r}
+#| label: rare-event-comparison
+#| echo: false
+#| fig-width: 5.2
+#| fig-height: 2.3
+#| fig-cap: >-
+#|   Estimates of the rare-event probability $p$ from 500 independent runs of
+#|   ordinary Monte Carlo and importance sampling.
+
+ggplot(rare_runs, aes(run, estimate / p_rare, color = method)) +
+  geom_hline(yintercept = 1, linetype = "dashed") +
+  geom_point(size = 0.6, alpha = 0.6) +
+  facet_wrap(vars(method), nrow = 1) +
+  scale_color_manual(
+    values = c(
+      "Ordinary MC" = "royalblue",
+      "Importance sampling" = "darkorange"
+    )
+  ) +
+  guides(color = "none") +
+  labs(x = "Run", y = expression(hat(p) / p))
+```
+
+The dashed line is the truth. MC returned zero in
+`r sprintf("%.1f", rare_zero_percent)`% of runs.
+
+\medskip\pause
+
+IS had about `r round(rare_sd_ratio)` times smaller empirical standard deviation
+at the same sample size.
+
+## Laplace Approximation
+
+### Basic Idea
+
+Take a Gaussian approximation of the target density at its mode $x^*$ as the
+importance distribution.
+
+. . .
+
+### Motivation
+
+The connection comes from the second-order Taylor expansion of $\log f(x)$ at an
+interior mode $x^*$,
+$$
+  \log f(x) \approx \log f(x^*) - \frac{1}{2}(x - x^*)^T \Lambda (x - x^*)
+$$
+where $\Lambda$ is the Hessian of $-\log f(x)$ at $x^*$, assumed positive
+definite.
+
+\medskip\pause
+
+Exponentiating both sides gives:
+$$
+  f(x)
+  \approx f(x^*) \exp\left( -\frac{1}{2}(x - x^*)^T \Lambda (x - x^*) \right)
+$$
+
+## Laplace Approximation
+
+### Steps
+
+1. Find the mode $x^* = \argmax_x f(x)$.\pause
+2. Compute the Hessian $\Lambda$ of $-\log f(x)$ at $x^*$.\pause
+3. If $\Lambda$ is positive definite, use $\mathcal{N}(x^*, \Lambda^{-1})$ as
+   the importance distribution.
+
+. . .
+
+### When to Use
+
+Useful for smooth targets with an approximately Gaussian shape near the mode.
+Check the tails before using it for importance sampling.
+
+## Example: Gamma Distribution
+
+::: {.columns}
+::::: {.column width="47%"}
+The density of the $\mathrm{Gamma}(3,1)$ distribution is
+$$
+  f(x) = \frac{1}{2} x^2 e^{-x}, \quad x > 0.
+$$
+
+. . .
+
+The mode is at $x^* = 2$ and the Hessian of $-\log f(x)$ at $x^*$ is
+$$
+  \Lambda = \frac{\alpha - 1}{(x^*)^2} = \frac 1 2.
+$$
+
+\medskip\pause
+
+So the Laplace approximation is $\mathcal{N}(2, 2)$, with standard deviation
+$\sqrt{2}$.
+:::::
+
+::::: {.column width="47%"}
+```{r}
+#| label: laplace-approx-plot
+#| echo: false
+#| fig-cap: >-
+#|   Target (solid black) and Laplace approximation (dashed blue) densities for
+#|   a Gamma(3,1) distribution.
+
+f_density <- function(x) dgamma(x, shape = 3, rate = 1) # Gamma(3,1)
+log_f <- function(x) log(f_density(x))
+
+x_star <- (3 - 1) / 1
+lambda <- 2 / (x_star^2)
+sd_laplace <- 1 / sqrt(lambda)
+
+x_grid <- seq(-2, 10, length.out = 400)
+
+df <- tibble(
+  x = x_grid,
+  f = f_density(x_grid),
+  laplace = dnorm(x_grid, mean = x_star, sd = sd_laplace),
+) |>
+  pivot_longer(
+    cols = c(f, laplace),
+    names_to = "Density",
+    values_to = "value"
+  ) |>
+  filter(value > 0)
+
+# Plot
+ggplot(
+  df,
+  aes(x = x, y = value, color = Density, linetype = Density)
+) +
+  geom_line() +
+  scale_color_manual(
+    values = c(f = "black", laplace = "steelblue")
+  ) +
+  scale_linetype_manual(
+    values = c(f = "solid", laplace = "dashed")
+  ) +
+  theme(legend.position.inside = c(0.8, 0.8)) +
+  guides(
+    color = guide_legend(position = "inside"),
+    linetype = guide_legend(position = "inside")
+  ) +
+  labs(y = "Density")
+```
+:::::
+:::
+
+## Adaptive Importance Sampling
+
+Adaptive importance sampling iteratively refines the importance distribution
+based on the samples obtained.
+
+. . .
+
+### Basic Idea
+
+Start with an initial importance distribution and refine it based on samples and
+weights.
+
+. . .
+
+### Steps
+
+1. Choose an initial importance distribution $g_0(x)$ and set $n = 0$.\pause
+2. Draw samples from the current proposal $g_n$ and compute weights.\pause
+3. Fit $g_{n+1}$ using the weighted samples, then increment $n$. \pause
+4. Repeat steps 2-3 until the proposal stabilizes.
+
+## Moment-Matching Importance Sampling
+
+One simple adaptive strategy is to use moment-matching to update a Gaussian
+importance distribution.
+
+\medskip\pause
+
+At iteration $n$, draw samples $x_1, \ldots, x_N \sim g_n(x)$ and compute
+weights
+$$
+  w_i^* = \frac{f(x_i)}{g_n(x_i)}.
+$$
+
+. . .
+
+Then update the importance distribution parameters as $$
+\begin{aligned}
+  \mu_{n + 1}      &= \frac{\sum_{i=1}^N w_i^* x_i}{\sum_{i=1}^N w_i^*},\\
+  \sigma^2_{n + 1} &= \frac{\sum_{i=1}^N w_i^* (x_i - \mu_{n + 1})^2}{\sum_{i=1}^N w_i^*}.
+\end{aligned}
+$$
+
+\pdfpcnote{
+This can be extended to multivariate targets using weighted covariance.
+}
+
+##
+
+```{r}
+#| echo: false
+#| label: adaptive-importance-demo
+
+library(ggplot2)
+library(tibble)
+
+# Target density: bimodal mixture
+f_density <- function(x) {
+  0.4 * dnorm(x, -2, 1) + 0.6 * dnorm(x, 3, 0.5)
+}
+
+# Adaptive importance sampling function
+adaptive_is <- function(
+  N = 1000,
+  n_iter = 5,
+  q_init_mean = 0,
+  q_init_sd = 1
+) {
+  # Store proposal params and samples
+  proposals <- list()
+  samples <- list()
+  weights <- list()
+
+  mean_q <- q_init_mean
+  sd_q <- q_init_sd
+
+  for (i in 1:n_iter) {
+    # Draw from current proposal
+    x <- rnorm(N, mean = mean_q, sd = sd_q)
+    w <- f_density(x) / dnorm(x, mean = mean_q, sd = sd_q)
+    w_norm <- w / sum(w)
+
+    # Store current step
+    proposals[[i]] <- c(mean = mean_q, sd = sd_q)
+    samples[[i]] <- x
+    weights[[i]] <- w_norm
+
+    # Update proposal using weighted moments
+    mean_q <- sum(w_norm * x)
+    sd_q <- sqrt(sum(w_norm * (x - mean_q)^2))
+  }
+
+  return(list(
+    proposals = proposals,
+    samples = samples,
+    weights = weights
+  ))
+}
+
+# Run adaptive importance sampling
+set.seed(123)
+res <- adaptive_is(N = 1000, n_iter = 5)
+
+# Plotting function for a given iteration
+plot_step <- function(iter) {
+  proposal <- res$proposals[[iter]]
+  x_grid <- seq(-6, 6, length.out = 400)
+  df <- tibble(
+    x = x_grid,
+    target = f_density(x_grid),
+    importance = dnorm(
+      x_grid,
+      mean = proposal["mean"],
+      sd = proposal["sd"]
+    )
+  ) |>
+    pivot_longer(
+      cols = c(target, importance),
+      names_to = "Density",
+      values_to = "value"
+    )
+
+  # Calculate ESS and CV for current iteration
+  w <- res$weights[[iter]]
+  N <- length(w)
+  ess <- (sum(w))^2 / sum(w^2)
+  cv <- sqrt(mean((w - mean(w))^2)) / mean(w)
+
+  ggplot(
+    df,
+    aes(x = x, y = value, color = Density, linetype = Density)
+  ) +
+    geom_line() +
+    scale_color_manual(
+      values = c(target = "black", importance = "steelblue")
+    ) +
+    scale_linetype_manual(
+      values = c(target = "solid", importance = "dashed")
+    ) +
+    lims(x = c(-6, 6), y = c(0, 0.6)) +
+    labs(
+      y = "Density",
+      subtitle = sprintf(
+        "Iteration %d: ESS = %.0f, CV = %.1f",
+        iter,
+        ess,
+        cv
+      )
+    )
+}
+```
+
+```{r}
+#| label: adaptive-importance-fig
+#| echo: false
+#| fig-show: animate
+#| fig-width: 5.4
+#| fig-height: 2.5
+#| fig-cap: "Adaptive importance sampling with a Gaussian proposal."
+
+for (iter in seq_along(res$proposals)) {
+  print(plot_step(iter))
+}
+```
+
+## Defensive Importance Sampling
+
+Return to the $\mathrm{Gamma}(3,1)$ target and estimating $\E_f[X] = 3$. The
+Laplace proposal $g_L = \mathcal{N}(2,2)$ has a right tail that is too light:
+ordinary IS has \alert{infinite variance}.
+
+\medskip\pause
+
+Add a heavy-tailed component $g_t$, the density of $2 + \sqrt{2}T$ with
+$T \sim t_3$:
+$$
+  g_{\mathrm{mix}}(x) = 0.9 g_L(x) + 0.1 g_t(x).
+$$
+
+. . .
+
+Since $g_{\mathrm{mix}} \geq 0.1g_t$, the mixture inherits protection from the
+Student-$t$ tails. For this Gamma mean, it restores \alert{finite variance}.
+
+\pdfpcnote{
+For h(x) = x, the second moment of an ordinary IS contribution is the integral
+of x squared times f squared divided by g. For the Gaussian proposal, this
+integrand is proportional to x to the sixth power times
+exp(x squared divided by 4 minus 3x), whose integral diverges.
+
+The Student-t density decays as x to the minus fourth power, so its second-moment
+integrand decays as x to the tenth power times exp(-2x), which is integrable.
+Since the mixture is at least 0.1 times the Student-t density, its second moment
+is at most ten times the Student-t second moment. This restores finite variance,
+although it need not give a smaller variance than direct Monte Carlo.
+}
+
+##
+
+```{r}
+#| label: gamma-defensive-fig
+#| echo: false
+#| fig-width: 5.4
+#| fig-height: 3
+#| fig-cap: >-
+#|   Gamma(3,1) target and proposals (left); importance weights on a logarithmic
+#|   scale (right).
+
+gamma_defensive <- tibble(
+  x = seq(-3, 20, length.out = 601),
+  target = dgamma(x, shape = 3, rate = 1),
+  laplace = dnorm(x, mean = 2, sd = sqrt(2)),
+  student = dt((x - 2) / sqrt(2), df = 3) / sqrt(2),
+  mixture = 0.9 * laplace + 0.1 * student
+)
+
+defensive_colors <- c(
+  target = "black",
+  laplace = "royalblue",
+  mixture = "darkorange"
+)
+defensive_lines <- c(
+  target = "solid",
+  laplace = "dashed",
+  mixture = "dotdash"
+)
+defensive_labels <- c(
+  target = "Target",
+  laplace = "Laplace",
+  mixture = "Mixture"
+)
+
+p_defensive_densities <- gamma_defensive |>
+  filter(x <= 12) |>
+  pivot_longer(
+    c(target, laplace, mixture),
+    names_to = "density"
+  ) |>
+  ggplot(aes(x, value, color = density, linetype = density)) +
+  geom_line() +
+  scale_color_manual(
+    values = defensive_colors,
+    labels = defensive_labels
+  ) +
+  scale_linetype_manual(
+    values = defensive_lines,
+    labels = defensive_labels
+  ) +
+  guides(
+    color = guide_legend(position = "bottom"),
+    linetype = guide_legend(position = "bottom")
+  ) +
+  labs(
+    x = expression(x),
+    y = "Density",
+    color = NULL,
+    linetype = NULL
+  )
+
+p_defensive_weights <- gamma_defensive |>
+  filter(x > 0) |>
+  transmute(
+    x,
+    laplace = target / laplace,
+    mixture = target / mixture
+  ) |>
+  pivot_longer(
+    c(laplace, mixture),
+    names_to = "proposal",
+    values_to = "weight"
+  ) |>
+  ggplot(aes(x, weight, color = proposal, linetype = proposal)) +
+  geom_line() +
+  scale_y_log10(
+    breaks = 10^c(0, 10, 20, 30),
+    labels = function(breaks) {
+      parse(text = paste0("10^", log10(breaks)))
+    }
+  ) +
+  scale_color_manual(
+    values = defensive_colors,
+    labels = defensive_labels
+  ) +
+  scale_linetype_manual(
+    values = defensive_lines,
+    labels = defensive_labels
+  ) +
+  guides(
+    color = guide_legend(position = "bottom"),
+    linetype = guide_legend(position = "bottom")
+  ) +
+  labs(
+    x = expression(x),
+    y = expression(f(x) / g(x)),
+    color = NULL,
+    linetype = NULL
+  )
+
+p_defensive_densities + p_defensive_weights
+```
+
+## Exercise: Von Mises Importance Sampling
+
+### Step 1
+
+Estimate the arithmetic mean of the von Mises distribution on $[-\pi,\pi]$ with
+$\mu = 0$ and $\kappa = 2$. Plot convergence toward $\E X = 0$.
+
+```{r}
+#| label: vonmises-density
+
+dvmises <- function(x, mu = 0, kappa = 2) {
+  ifelse(
+    abs(x) <= pi,
+    exp(kappa * cos(x - mu)) / (2 * pi * besselI(kappa, 0)),
+    0
+  )
+}
+```
+
+. . .
+
+### Step 2
+
+Compute the estimate of the mean and its standard error.
+
+. . .
+
+### Step 3
+
+Compute the effective sample size and coefficient of variation of the importance
+weights. Experiment with different importance densities to see if you find a
+better one.
+
+\pdfpcnote{
+For nonzero mu, the arithmetic mean on this fixed interval generally differs
+from mu, the circular mean direction. Keep mu = 0 for this exercise.
+}
+
+## Solution: Step 1 — Estimate the Mean
+
+The density is symmetric about zero, so $x f(x)$ is odd and
+$\E X = \int_{-\pi}^{\pi} x f(x)\,\mathrm{d}x = 0$.
+Use the proposal $g = \mathcal{N}(0,(\pi/2)^2)$ and ordinary IS:
+$$
+  \hat\mu_n = \frac{1}{n}\sum_{i=1}^n X_i w_i^*,
+  \qquad w_i^* = \frac{f(X_i)}{g(X_i)}.
+$$
+The target density is normalized, so there is no need to divide by the sum
+of weights. Draws outside $[-\pi,\pi]$ receive zero weight and remain in the
+sample of size $n$.
+
+```{r}
+#| label: vmises-importance
+
+set.seed(2026)
+vm_N <- 10000
+vm_x <- rnorm(vm_N, sd = pi / 2)
+vm_weights <- dvmises(vm_x) / dnorm(vm_x, sd = pi / 2)
+vm_values <- vm_x * vm_weights
+vm_running_mean <- cumsum(vm_values) / seq_len(vm_N)
+```
+
+## Solution: Step 1 — Convergence
+
+```{r}
+#| label: vmises-convergence
+#| echo: false
+#| fig-width: 5
+#| fig-height: 2.8
+#| fig-cap: "Running ordinary IS estimate of the von Mises arithmetic mean."
+
+plot(
+  seq_len(vm_N), vm_running_mean,
+  type = "l", col = "steelblue",
+  xlab = "Number of samples", ylab = "Estimated mean"
+)
+abline(h = 0, col = "darkorange", lty = 2)
+```
+
+The running estimate approaches zero by the law of large numbers; its path
+need not be monotone.
+
+## Solution: Step 2 — Standard Error
+
+Set $Y_i = X_i w_i^*$. The estimate is the sample mean of the $Y_i$, so
+$$
+  \widehat{\mathrm{se}}(\hat\mu_N)
+  = \frac{s_Y}{\sqrt{N}},
+  \qquad
+  s_Y^2 = \frac{1}{N-1}\sum_{i=1}^N(Y_i-\hat\mu_N)^2.
+$$
+Use the standard deviation of the weighted contributions, not the sampled
+$X_i$ or the weights alone.
+
+```{r}
+#| label: vmises-standard-error
+
+vm_estimate <- mean(vm_values)
+vm_se <- sd(vm_values) / sqrt(vm_N)
+c(
+  estimate = vm_estimate,
+  standard_error = vm_se,
+  lower_95 = vm_estimate - 1.96 * vm_se,
+  upper_95 = vm_estimate + 1.96 * vm_se
+)
+```
+
+## Solution: Step 3 — Weight Diagnostics
+
+Using unnormalized weights, calculate
+$$
+  \mathrm{ESS} = \frac{(\sum_i w_i^*)^2}{\sum_i (w_i^*)^2},
+  \qquad
+  \mathrm{CV} = \frac{\sqrt{N^{-1}\sum_i(w_i^*-\bar w^*)^2}}{\bar w^*}.
+$$
+The CV uses divisor $N$, as in the lecture; R's `sd()` uses $N-1$.
+
+```{r}
+#| label: vmises-weight-diagnostics
+
+vm_diagnostics <- function(x, weights) {
+  n <- length(x)
+  data.frame(
+    estimate = mean(x * weights),
+    SE = sd(x * weights) / sqrt(n),
+    ESS = sum(weights)^2 / sum(weights^2),
+    CV = sqrt(mean((weights - mean(weights))^2)) / mean(weights)
+  )
+}
+vm_baseline <- vm_diagnostics(vm_x, vm_weights)
+vm_baseline
+```
+
+## Solution: Step 3 — Compare Proposals
+
+Try normal proposals with standard deviations $1$ and $1.3$, which concentrate
+more draws near the target's mode, and $\mathrm{Uniform}(-\pi,\pi)$, which
+covers exactly its support. All four proposals are positive throughout the
+target's support.
+
+```{r}
+#| label: vmises-proposal-comparison
+
+set.seed(2027)
+vm_x_normal <- rnorm(vm_N, sd = 1)
+vm_w_normal <- dvmises(vm_x_normal) / dnorm(vm_x_normal)
+vm_x_uniform <- runif(vm_N, -pi, pi)
+vm_w_uniform <- dvmises(vm_x_uniform) /
+  dunif(vm_x_uniform, -pi, pi)
+vm_x_middle <- rnorm(vm_N, sd = 1.3)
+vm_w_middle <- dvmises(vm_x_middle) / dnorm(vm_x_middle, sd = 1.3)
+
+vm_comparison <- rbind(
+  vm_baseline,
+  vm_diagnostics(vm_x_normal, vm_w_normal),
+  vm_diagnostics(vm_x_middle, vm_w_middle),
+  vm_diagnostics(vm_x_uniform, vm_w_uniform)
+)
+vm_comparison <- data.frame(
+  proposal = c(
+    "Normal, sd = pi/2", "Normal, sd = 1",
+    "Normal, sd = 1.3", "Uniform(-pi, pi)"
+  ),
+  vm_comparison
+)
+knitr::kable(vm_comparison, digits = c(0, 5, 5, 0, 3), row.names = FALSE)
+```
+
+## Solution: Step 3 — Interpretation
+
+At the same sample size, the smallest estimated standard error in this run is
+obtained with **`r vm_comparison$proposal[which.min(vm_comparison$SE)]`**.
+Compare standard errors to judge precision for this particular mean; proximity
+of one estimate to zero can be luck.
+
+Higher ESS and lower CV indicate more even weights, but do not necessarily
+give a smaller standard error: that also depends on the integrand $h(x)=x$.
+For ordinary IS the ideal proposal is proportional to $|x|f(x)$, rather than
+just $f(x)$. Thus concentrating too tightly around zero can miss useful tail
+contributions. These diagnostics are empirical, so repeat the comparison with
+other seeds or larger samples before drawing strong conclusions.
+
+## Summary
+
+### Monte Carlo Methods
+
+Estimate integrals and means using random sampling when analytic solutions are
+not possible.
+
+. . .
+
+### Importance Sampling
+
+Focus samples where they matter most, but choose your proposal carefully to
+avoid large or variable weights.
+
+. . .
+
+### Diagnostics
+
+Examine weights, weighted integrand values, and ESS to detect instability. These
+checks cannot guarantee accuracy or reveal every missed region.
+
+. . .
+
+### Picking Importance Distributions
+
+It's hard! But use adaptive and defensive methods to help fix poor coverage and
+improve robustness.
+
+## Next Time
+
+### Optimization
+
+We introduce optimization methods for minimizing and maximizing functions.
+
+\medskip\pause
+
+We'll focus on **convex optimization**, a special class of optimization problems
+that are easier to solve and have nice properties.
+
+\lectureappendix
+
+# Appendix
+
+## Variance for IS with Normalized Weights
+
+Computing the variance of IS with normalized weights is more complicated because
+the estimator is a \alert{ratio of random variables}.
+
+\medskip\pause
+
+Write $c = \E_g[w^*(X)]$. If both $h(X)w^*(X)$ and $w^*(X)$ have finite
+variances, the multivariate CLT gives
+$$
+  \frac{1}{N} \sum_{i=1}^N \begin{bmatrix} h(X_i) w^*(X_i) \\ w^*(X_i) \end{bmatrix}
+  \overset{\mathrm{approx}}{\sim}
+  \mathcal{N}\left(
+    c \begin{bmatrix} \mu \\ 1\end{bmatrix},
+    \frac{1}{N} \begin{bmatrix} \sigma^{2}_{\mathrm{IS}} & \gamma \\ \gamma & \sigma^2_{w^*} \end{bmatrix}
+  \right),
+$$
+where $$
+\begin{aligned}
+  \sigma^2_{\mathrm{IS}} & = \V \big(h(X_1) w^*(X_1)\big) \\
+  \gamma & = \cov (h(X_1) w^*(X_1), w^*(X_1)) \\
+  \sigma^2_{w^*} & = \V (w^*(X_1))
+\end{aligned}
+$$
+
+## Importance Sampling Variance
+
+We can then apply the $\Delta$-method with $t(x, y) = x / y$.
+
+\medskip\pause
+
+Observe that $\nabla t(x, y) = \begin{bmatrix} 1 / y \\ -x / y^2 \end{bmatrix}$
+, whence
+
+$$
+  \nabla t(c\mu, c)^T \left(\begin{array}{cc} \sigma^{2}_{\mathrm{IS}} & \gamma \\ \gamma & \sigma^2_{w^*}
+  \end{array} \right) \nabla t(c\mu, c) = \frac{\sigma^{2}_{\mathrm{IS}} + \mu^2 \sigma_{w^*}^2 - 2 \mu \gamma}{c^{2}}.
+$$
+
+. . .
+
+By the $\Delta$-method,
+$$
+  \hat{\mu}_{\mathrm{IS}} \overset{\mathrm{approx}}{\sim} \mathcal{N}\left( \mu, \frac{\sigma^{2}_{\mathrm{IS}} + \mu^2 \sigma_{w^*}^2 - 2 \mu \gamma}{c^2 N} \right).
+$$
+
+. . .
+
+Plug in empirical estimates, estimating $c$ when it is unknown by
+$$
+  \hat{c} = \frac{1}{N} \sum_{i=1}^N w^*(X_i).
+$$
+
+If both densities in the weights are unnormalized, $c$ is the ratio of their
+normalizing constants.
+
+\pdfpcnote{
+hat(c) is just the MC estimate of c.
+}
+
+##
+
+```{r}
+#| label: delta-method-plot3D
+#| echo: false
+#| fig-width: 5
+#| fig-height: 4.5
+#| fig-cap: Tangent plane approximation of the function $t(x,y) = x/y$ at the
+#|   point $(2,3)$.
+
+library(plot3D)
+
+# Define function and means
+t_fun <- function(x, y) x / y
+mu_x <- 2
+mu_y <- 3
+
+# Grid for surface
+x_seq <- seq(1, 3, length.out = 26)
+y_seq <- seq(2, 4, length.out = 26)
+z <- outer(x_seq, y_seq, t_fun)
+
+# Tangent plane at (mu_x, mu_y)
+grad_x <- 1 / mu_y
+grad_y <- -mu_x / mu_y^2
+tangent_plane <- function(x, y) {
+  t_fun(mu_x, mu_y) + grad_x * (x - mu_x) + grad_y * (y - mu_y)
+}
+z_tangent <- outer(x_seq, y_seq, tangent_plane)
+
+# Plot both surfaces together
+persp3D(
+  x_seq,
+  y_seq,
+  z,
+  col = "steelblue",
+  xlab = "x",
+  ylab = "y",
+  zlab = "t(x, y)",
+  theta = 30,
+  phi = 10,
+  border = "black"
+)
+
+# Add tangent plane
+persp3D(
+  x_seq,
+  y_seq,
+  z_tangent,
+  add = TRUE,
+  col = "grey",
+  alpha = 0.6
+)
+
+# Add mean point
+points3D(
+  mu_x,
+  mu_y,
+  t_fun(mu_x, mu_y),
+  col = "darkorange",
+  pch = 19,
+  add = TRUE,
+  cex = 1
+)
+```

@@ -1,0 +1,16 @@
+
+```{r}
+remotes::install_github("nielsrhansen/RwR/RwR_package")
+```
+
+```{r}
+data(claims, package = "RwR")
+
+fit <- lm(log(claims) ~ log(sum) + grp, data = claims)
+
+op <- par(mfrow = c(2, 2))
+plot(fit)
+par(op)
+```
+
+

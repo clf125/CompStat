@@ -1,0 +1,95 @@
+# Week 2
+## Data
+```{r}
+infrared <- read.table("../../Data/infrared.txt", header = TRUE)
+F12 <- infrared$F12
+head(F12)
+```
+
+## Packages
+```{r}
+#| results: hide
+library(tidyverse)
+```
+## Exercise A.5 
+Write your own function, called `my_breaks`, which takes two arguments, `x` (a vector) and `h` (a positive integer). Let `h` have default value 5. The function should first sort `x` into increasing order and then return the vector that: starts with the smallest entry in `x`; contains every `h`th unique entry from the sorted `x`; ends with the largest entry in `x`.
+
+```{r}
+my_breaks <- function(x, h = 5) {
+  unique_x <- sort(unique(x))
+  breaks <- unique_x[seq(1, length(unique_x), by = h)]
+
+  sort(unique(c(
+    unique_x[1],
+    breaks,
+    unique_x[length(unique_x)]
+  )))
+}
+```
+
+```{r}
+x = c(1, 3, 2, 5, 10, 11, 1, 1, 3)
+my_breaks(x, h = 5)
+```
+## Exercise A.6 
+If there are no ties in the dataset, the function above will produce breakpoints with `h` observations in the interval between two consecutive breakpoints (except the last two perhaps). If there are ties, the function will by construction return unique breakpoints, but there may be more than `h` observations in some intervals.
+
+*The intention* is now to rewrite `my_breaks` so that, if possible, each interval contains `h` observations.
+
+Modify the `my_breaks` function with this intention and so that it has the following properties:
+
+- All breakpoints must be unique.
+- The range of the breakpoints must cover the range of `x`.
+- For two consecutive breakpoints, `a` and `b`, there must be at least `h` observations in the interval $(a,b]$, provided `h` $<$ `length(x)`. (With the exception that for the first two breakpoints, the interval is $[a,b]$.)
+
+```{r}
+my_breaks <- function(x, h = 5) {
+  stopifnot(is.numeric(x), length(x) > 0, all(is.finite(x)),
+            length(h) == 1, is.finite(h), h > 0, h == floor(h))
+
+  runs <- rle(sort(x))
+  values <- runs$values
+  counts <- runs$lengths
+  if (length(values) == 1) return(values)
+
+  breaks <- values[1]
+  n_in_interval <- counts[1] # The first interval includes the minimum.
+
+  for (i in seq.int(2, length(values))) {
+    n_in_interval <- n_in_interval + counts[i]
+    if (n_in_interval >= h) {
+      breaks <- c(breaks, values[i])
+      n_in_interval <- 0
+    }
+  }
+
+  # Merge any remaining observations into the last interval.
+  if (tail(breaks, 1) < tail(values, 1)) {
+    if (length(breaks) == 1) {
+      breaks <- c(breaks, tail(values, 1))
+    } else {
+      breaks[length(breaks)] <- tail(values, 1)
+    }
+  }
+
+  breaks
+}
+```
+
+
+
+
+## Exercise A.7 
+Write a function called `my_hist`, which takes a single argument h and plots a histogram of log(F12). Extend the implementation so that any additional argument specified when calling `my_hist` is passed on to hist. Investigate and explain what happens when executing the following function calls.
+
+```{r}
+my_hist <- function(h, ...) {
+  hist(log(F12), breaks = my_breaks(log(F12), h), ...)
+}
+```
+
+The argument `h` controls the minimum number of observations per interval using the function from A.6. The `...` passes additional arguments, such as `col`, `main`, and `xlab`, to `hist`. Since the intervals can have different widths, `hist` uses density on the vertical axis by default, so that each bar's area represents the proportion of observations in that interval.
+
+```{r}
+my_hist(20, col = "lightblue", main = "Histogram of log(F12)", xlab = "log(F12)")
+```

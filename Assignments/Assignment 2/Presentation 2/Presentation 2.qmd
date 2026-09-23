@@ -276,7 +276,7 @@ $$
 \ell'(y) = \sum_i x_i(z_i - e^{yx_i}), \qquad \ell''(y) = -\sum_i x_i^2 e^{yx_i} < 0.
 $$
 
-So $\ell$ is **concave** — this is exactly what makes the tangent-line construction valid: a tangent line to a concave function always lies *above* it.
+So $\ell$ is **concave** — hence we can use it as our proposal for the piecewise log-affine envelope.
 
 The tangent at $t_j$ has slope $a_j = \ell'(t_j)$ and intercept $b_j = \ell(t_j) - a_j t_j$.
 
@@ -291,10 +291,10 @@ $$
 With $c_0 = 0$ and $c_k = \infty$, these define the pieces. The lowest tangent gives $V(y) = a_j y + b_j$ on $[c_{j-1}, c_j]$, hence
 
 $$
-q(y) \leq e^{V(y)}.
+\alpha'q(y) \leq e^{V(y)}.
 $$
 
-Tangency means equality at the chosen points $\Rightarrow$ we can use $\alpha' = 1$ exactly.
+Tangency means equality at the chosen points $\Rightarrow$ we can use $\alpha' = 1$ as this works already.
 
 ## Sampling from the Envelope
 
@@ -317,7 +317,7 @@ Our own measurements confirm this is genuinely an empirical question, not a clos
 
 ## Implementing the Log-Affine Envelope (1/2)
 
-Building the piecewise tangent-line majorant and evaluating it at a point:
+Building the piecewise tangent-line and evaluating it at a point:
 
 ```{=latex}
 \scriptsize
@@ -343,7 +343,7 @@ eval_V <- function(envelope, y) {
 \normalsize
 ```
 
-Since tangency gives equality at each $t_j$, $\alpha' = 1$ exactly — no separate normalizing-constant step needed.
+Since tangency gives equality at each $t_j$, $\alpha' = 1$ — no separate normalizing-constant step is needed.
 
 ## Implementing the Log-Affine Envelope (2/2)
 
@@ -386,7 +386,7 @@ sample_fixed_vec <- rng_vec(sample_fixed_random)
 
 ## Finding the Best Number of Intervals
 
-A fixed, non-adaptive grid of $m$ tangent points, spaced over $[0, \hat{y} + 3\hat{\sigma}]$ (mode $\pm$ curvature-based spread). More points $\Rightarrow$ higher acceptance rate, but each proposal also costs more to build/sample from.
+A fixed, non-adaptive grid of $m$ tangent points, spaced over $[0, \hat{y} + 3\hat{\sigma}]$ (mode $\pm$ curvature-based spread). More points yields a higher acceptance rate, but each proposal also costs more to build and sample from.
 
 ```{=latex}
 \scriptsize
@@ -433,7 +433,7 @@ out <- readRDS("Assignments/Assignment 2/Presentation 2/best_m.rds")
 
 ![](sweep_plot.png){width="100%"}
 
-Time (left) drops sharply from $m=2$ to $m=5$, then is flat and noisy — re-running the sweep does not reliably pick the same argmin. Acceptance rate (right) is monotone and stable, so we take the smallest $m$ crossing 99% (dashed line): $m =$ `r out$best$m` (red point).
+Time (left) drops sharply from $m=2$ to $m=5$, and is then mostly flat — re-running the sweep does not reliably pick the same argmin. Acceptance rate (right) is monotone and stable, so we take the smallest $m$ crossing 99% (dashed line): $m =$ `r out$best$m` (red point).
 
 ## Correctness Check: Log-Affine Envelope
 

@@ -1,7 +1,0 @@
-\frametitle{Benchmarking Across N}
-\protect\phantomsection\label{benchmarking-across-n-1}
-\includegraphics[width=0.6\linewidth,height=\textheight,keepaspectratio]{bench_plot4.png}
-
-Both log-affine variants beat \texttt{cpp\_specialized\_gaussian} and
-\texttt{r\_vectorized\_faster\_gaussian} at every N, and the gap widens
-as N grows.

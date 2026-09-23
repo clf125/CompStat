@@ -137,26 +137,9 @@ empirical_rate <- mean(log(u_check) <= log_accept_gaussian_faster(y_check))
 
 ## Profiling: Where Does the Time Go?
 
-Profiling `log_rejection_sample_vec` (200,000 samples) with `Rprof`:
+Profiling `log_rejection_sample_vec` (200,000 samples) with `profvis`/`Rprof` — the call is shown at the top of the screenshot:
 
-```{=latex}
-\scriptsize
-```
-
-``` r
-profvis::profvis({
-  log_rejection_sample_vec(
-    N = 200000,
-    rproposal = gaussian_rproposal,
-    log_accept = log_accept_gaussian)
-})
-```
-
-```{=latex}
-\normalsize
-```
-
-![](profiling_before.png){width="90%"}
+![](profiling_before.png){width="80%"}
 
 **98.5% of self time is on one line** — not the math itself, but calling a fresh R closure once per proposal via `sapply`.
 

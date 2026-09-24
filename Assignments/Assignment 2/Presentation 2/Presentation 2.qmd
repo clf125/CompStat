@@ -90,6 +90,8 @@ y[accept]
 log_rejection_sample_vec <- rng_vec(log_rejection_sample_random)
 ```
 
+$$U \leq \alpha' q(y)/p(y) \Leftrightarrow \log(U) \leq \log q(y) + \log \alpha' - \log p(y)$$
+
 ```{=latex}
 \normalsize
 ```
@@ -141,7 +143,7 @@ Profiling `log_rejection_sample_vec` (200,000 samples) with `profvis`/`Rprof` �
 
 ![](profiling_before.png){width="80%"}
 
-**6570 of 6665 ms of self time — 98.5% — is on one line** — not the math itself, but calling a fresh R closure once per proposal via `sapply`.
+**6570 of 6665 ms of self time 98.5% is on one line** not the math itself, but calling a fresh R closure once per proposal via `sapply`.
 
 ## Vectorizing `log_f`
 
@@ -448,11 +450,11 @@ Both log-affine variants beat `cpp_specialized_gaussian` and `r_vectorized_faste
 
 **Acceptance rate decides the speed — not the language.**
 
-| Method | Acceptance |
-|---|---|
+| Method                       | Acceptance    |
+|------------------------------|---------------|
 | Gaussian envelope (R or C++) | $\approx$ 13% |
-| Log-affine, $m=5$ | 87.7% |
-| Log-affine, best $m$ | 99.5% |
+| Log-affine, $m=5$            | 87.7%         |
+| Log-affine, best $m$         | 99.5%         |
 
 ## Questions & Further Work
 

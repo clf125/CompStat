@@ -157,7 +157,7 @@ With a 13.4% acceptance rate, roughly 1.5 million proposals get evaluated to pro
 
 ``` r
 log_f_vec_faster <- function(y) {
-  xy <- outer(dat$x, y)         # xy[i,j] = x_i * y_j
+  xy <- outer(dat$x, y)
   colSums(dat$z * xy - exp(xy))
 }
 ```

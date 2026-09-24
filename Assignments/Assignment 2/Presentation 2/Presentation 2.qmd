@@ -269,10 +269,10 @@ The tangent at $t_j$ has slope $a_j = \ell'(t_j)$ and intercept $b_j = \ell(t_j)
 Adjacent tangents intersect at
 
 $$
-c_j = \frac{b_{j+1} - b_j}{a_j - a_{j+1}}.
+z_j = \frac{b_{j+1} - b_j}{a_j - a_{j+1}}.
 $$
 
-With $c_0 = 0$ and $c_k = \infty$, these define the pieces. The lowest tangent gives $V(y) = a_j y + b_j$ on $[c_{j-1}, c_j]$, hence
+With $z_0 = 0$ and $z_k = \infty$, these define the pieces. The lowest tangent gives $V(y) = a_j y + b_j$ on $[z_{j-1}, c_j]$, hence
 
 $$
 \alpha'q(y) \leq e^{V(y)}.

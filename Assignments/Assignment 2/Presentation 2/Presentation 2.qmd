@@ -90,7 +90,7 @@ y[accept]
 log_rejection_sample_vec <- rng_vec(log_rejection_sample_random)
 ```
 
-$$U \leq \alpha' q(y)/p(y) \Leftrightarrow \log(U) \leq \log q(y) + \log \alpha' - \log p(y)$$
+$$U \leq \alpha' f(y)/p(y) \Leftrightarrow \log(U) \leq \log f(y) + \log \alpha' - \log p(y)$$
 
 ```{=latex}
 \normalsize
